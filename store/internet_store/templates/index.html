@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero" id="hero">
+  <div class="slide s1 on"><h1>Нова колекція осені</h1><p>Якість від виробника за чесними цінами.</p><a class="cta" href="#hits">Дивитись</a></div>
+  <div class="slide s2"><h1>Розпродаж до −50%</h1><p>Обмежена пропозиція на популярні товари.</p><a class="cta" href="{% url 'catalog' %}?sale=1">До акцій</a></div>
+  <div class="slide s3"><h1>Безкоштовна доставка</h1><p>Від {{ SHOP.free_delivery_from }} ₴ по всій Україні.</p><a class="cta" href="{% url 'delivery' %}">Умови</a></div>
+  <div class="dots" id="dots"></div>
+</section>
+
+<h2>Категорії</h2>
+<div class="tiles">
+  {% for c in tiles %}<a class="tile" href="{{ c.get_absolute_url }}"><span>{{ c.emoji }}</span>{{ c.name }}</a>{% endfor %}
+</div>
+
+<h2 id="hits">Хіти продажу</h2>
+<div class="tabs">
+  <a class="tabbtn{% if not active_tab %} on{% endif %}" href="{% url 'index' %}#hits">Усі</a>
+  {% for t in tabs %}<a class="tabbtn{% if active_tab == t.slug %} on{% endif %}" href="?tab={{ t.slug }}#hits">{{ t.name }}</a>{% endfor %}
+</div>
+<div class="grid">
+  {% for p in hits %}{% include "partials/_product_card.html" %}
+  {% empty %}<p class="empty">Поки що немає товарів</p>{% endfor %}
+</div>
+<p class="more"><a class="cta-outline" href="{% url 'catalog' %}">Весь каталог →</a></p>
+
+<div class="perks">
+  <div class="perk"><b>🚚 Швидка доставка</b><span>Відправка в день замовлення</span></div>
+  <div class="perk"><b>↩️ Повернення 14 днів</b><span>Без зайвих питань</span></div>
+  <div class="perk"><b>🛡️ Гарантія якості</b><span>Власне виробництво</span></div>
+  <div class="perk"><b>💬 Консультація</b><span>Допоможемо з вибором</span></div>
+</div>
+
+<h2>Про магазин</h2>
+<p class="about">Тут розмістіть опис вашого магазину: хто ви, що виробляєте або продаєте, чому варто обрати саме вас. Цей блок також корисний для SEO-тексту.</p>
+{% endblock %}
