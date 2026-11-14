@@ -29,6 +29,37 @@ class ShopFlowTests(TestCase):
         self.assertEqual(order.items.get().quantity, 2)
         self.assertContains(self.client.get(reverse("cart")), "порожній")
 
+    def test_ajax_add_returns_drawer_json(self):
+        p = Product.objects.get(slug="podushka-comfort")
+        r = self.client.post(reverse("cart_add", args=[p.pk]), {"quantity": 2},
+                             headers={"X-Requested-With": "XMLHttpRequest"})
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data["count"], 2)
+        self.assertIn(p.name, data["html"])
+        self.assertIn("878", data["html"])
+        self.assertIn(reverse("checkout"), data["html"])
+
+    def test_plain_add_still_redirects_with_message(self):
+        p = Product.objects.get(slug="podushka-comfort")
+        r = self.client.post(reverse("cart_add", args=[p.pk]), {"next": reverse("catalog")})
+        self.assertRedirects(r, reverse("catalog"))
+
+    def test_ajax_update_and_remove(self):
+        p = Product.objects.get(slug="podushka-comfort")
+        ajax = {"X-Requested-With": "XMLHttpRequest"}
+        self.client.post(reverse("cart_add", args=[p.pk]), {"quantity": 3}, headers=ajax)
+        data = self.client.post(reverse("cart_update", args=[p.pk]), {"quantity": 2}, headers=ajax).json()
+        self.assertEqual(data["count"], 2)
+        data = self.client.post(reverse("cart_remove", args=[p.pk]), headers=ajax).json()
+        self.assertEqual(data["count"], 0)
+        self.assertIn("порожній", data["html"])
+
+    def test_drawer_endpoint(self):
+        data = self.client.get(reverse("cart_drawer")).json()
+        self.assertEqual(data["count"], 0)
+        self.assertIn("порожній", data["html"])
+
     def test_success_page_is_private(self):
         order = Order.objects.create(name="x", phone="1", city="c", address="a")
         r = self.client.get(reverse("order_success", args=[order.pk]))

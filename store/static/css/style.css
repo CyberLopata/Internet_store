@@ -62,8 +62,8 @@ footer{margin-top:40px;background:var(--surface);border-top:1px solid var(--bord
 .fcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px}
 .fcols h4{margin:0 0 10px}.fcols a{display:block;color:var(--muted);padding:3px 0}
 .copy{text-align:center;color:var(--muted);margin-top:24px;font-size:13px}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(380px,100%);background:var(--bg);border-left:1px solid var(--border);transform:translateX(100%);transition:transform .25s;z-index:20;display:flex;flex-direction:column;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
-.drawer.open{transform:none}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(380px,100%);background:var(--bg);border-left:1px solid var(--border);transform:translateX(100%);visibility:hidden;transition:transform .3s cubic-bezier(.22,.8,.3,1),visibility 0s .3s;z-index:20;display:flex;flex-direction:column;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.drawer.open{transform:none;visibility:visible;transition:transform .3s cubic-bezier(.22,.8,.3,1);box-shadow:-12px 0 32px rgba(0,0,0,.18)}
 .dh{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:18px;margin-bottom:12px}
 .items{flex:1;overflow:auto}
 .row{display:flex;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
@@ -71,8 +71,8 @@ footer{margin-top:40px;background:var(--surface);border-top:1px solid var(--bord
 .row button{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:6px;width:26px;height:26px;cursor:pointer}
 .total{display:flex;justify-content:space-between;font-weight:700;font-size:18px;padding:12px 0}
 .empty{color:var(--muted);text-align:center;margin-top:40px}
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;z-index:15}
-.scrim.on{display:block}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .3s;z-index:15}
+.scrim.on{opacity:1;pointer-events:auto}
 @media(max-width:640px){.icons .t{display:none}.slide{padding:24px}}
 /* ---- Додаткові сторінки: каталог, товар, кошик, оформлення ---- */
 .ibtn{display:inline-block;text-decoration:none}
@@ -150,6 +150,26 @@ a.add{display:block;text-align:center}
 .guarantees li{display:flex;gap:10px;align-items:center}
 .guarantees a{color:var(--primary);text-decoration:underline;text-underline-offset:2px}
 :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ---- Висувний кошик ---- */
+.dclose{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:14px}
+.dclose:hover{border-color:var(--primary)}
+.dbody{flex:1;min-height:0;display:flex;flex-direction:column}
+.drawer .row{gap:10px}
+.drawer .row form{margin:0}
+.drawer .row button:hover:not(:disabled){border-color:var(--primary)}
+.drawer .row button:disabled{opacity:.5;cursor:default}
+.drawer .n{min-width:0;display:flex;flex-direction:column;gap:2px}
+.dname{font-weight:600;line-height:1.3}
+.dname:hover{color:var(--primary)}
+.dthumb{width:52px;height:52px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:26px;overflow:hidden;flex-shrink:0;border:1px solid var(--border)}
+.dthumb.has-img{background:#f8fafb}
+.dthumb img{width:100%;height:100%;object-fit:contain;padding:3px;display:block}
+.dqty{display:flex;align-items:center;gap:6px}
+.dqty span{min-width:20px;text-align:center;font-weight:600}
+.dfoot{border-top:1px solid var(--border);padding-top:4px}
+.dfoot .add{padding:12px}
+@media(prefers-reduced-motion:reduce){.drawer,.drawer.open,.scrim{transition:none}}
 @media(max-width:800px){
   .pdp{grid-template-columns:1fr;gap:20px}
   .pgallery{position:static}

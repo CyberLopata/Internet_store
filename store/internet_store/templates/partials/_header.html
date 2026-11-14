@@ -6,7 +6,7 @@
     <button type="submit">Знайти</button>
   </form>
   <div class="icons">
-    <a class="ibtn" href="{% url 'cart' %}">🛒 <span class="t">Кошик</span>{% if cart_count %}<span class="badge">{{ cart_count }}</span>{% endif %}</a>
+    <a class="ibtn" href="{% url 'cart' %}" data-cart-open>🛒 <span class="t">Кошик</span><span class="badge" data-cart-count{% if not cart_count %} hidden{% endif %}>{{ cart_count }}</span></a>
   </div>
 </div></header>
 <nav class="cats"><div class="wrap">

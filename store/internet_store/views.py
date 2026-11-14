@@ -2,7 +2,9 @@ from django.contrib import messages
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.db.models import F, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
@@ -75,9 +77,29 @@ def _back(request, fallback="cart"):
     return redirect(fallback)
 
 
+def _is_ajax(request):
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _drawer_response(request):
+    """Вміст висувного кошика + кількість товарів для бейджа в шапці."""
+    cart = Cart(request)
+    items = list(cart.items())  # спершу items(): він прибирає неактивні товари
+    html = render_to_string(
+        "partials/_cart_drawer_body.html",
+        {"items": items, "total": sum(i["subtotal"] for i in items)},
+        request=request,
+    )
+    return JsonResponse({"count": len(cart), "html": html})
+
+
 def cart_detail(request):
     items = list(Cart(request).items())
     return render(request, "cart.html", {"items": items, "total": sum(i["subtotal"] for i in items)})
+
+
+def cart_drawer(request):
+    return _drawer_response(request)
 
 
 @require_POST
@@ -88,6 +110,8 @@ def cart_add(request, pk):
     except ValueError:
         qty = 1
     Cart(request).add(product, qty)
+    if _is_ajax(request):
+        return _drawer_response(request)
     messages.success(request, f"«{product.name}» додано до кошика")
     return _back(request)
 
@@ -99,12 +123,16 @@ def cart_update(request, pk):
     except ValueError:
         qty = 1
     Cart(request).set(pk, qty)
+    if _is_ajax(request):
+        return _drawer_response(request)
     return redirect("cart")
 
 
 @require_POST
 def cart_remove(request, pk):
     Cart(request).remove(pk)
+    if _is_ajax(request):
+        return _drawer_response(request)
     return redirect("cart")
 
 

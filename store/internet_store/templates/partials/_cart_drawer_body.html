@@ -1,0 +1,29 @@
+{% if items %}
+<div class="items">
+  {% for i in items %}
+  <div class="row">
+    <a class="dthumb{% if i.product.image %} has-img{% endif %}" href="{{ i.product.get_absolute_url }}"{% if not i.product.image %} style="background:{{ i.product.color }}"{% endif %}>{% if i.product.image %}<img src="{{ i.product.image.url }}" alt="{{ i.product.name }}">{% else %}{{ i.product.emoji }}{% endif %}</a>
+    <div class="n">
+      <a class="dname" href="{{ i.product.get_absolute_url }}">{{ i.product.name }}</a>
+      <b>{{ i.subtotal|floatformat:"0g" }} ₴</b>
+    </div>
+    <form method="post" action="{% url 'cart_update' i.product.pk %}" class="dqty" data-cart-form>{% csrf_token %}
+      <button type="submit" name="quantity" value="{{ i.quantity|add:'-1' }}" aria-label="Менше">−</button>
+      <span>{{ i.quantity }}</span>
+      <button type="submit" name="quantity" value="{{ i.quantity|add:'1' }}" aria-label="Більше">+</button>
+    </form>
+    <form method="post" action="{% url 'cart_remove' i.product.pk %}" data-cart-form>{% csrf_token %}
+      <button type="submit" aria-label="Видалити «{{ i.product.name }}»">✕</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+<div class="dfoot">
+  <div class="total"><span>Разом</span><span>{{ total|floatformat:"0g" }} ₴</span></div>
+  <a class="add" href="{% url 'checkout' %}">Оформити замовлення</a>
+  <a class="back" href="{% url 'cart' %}">Переглянути кошик</a>
+</div>
+{% else %}
+<p class="empty">Кошик порожній</p>
+<p class="more"><a class="cta-outline" href="{% url 'catalog' %}">Перейти до каталогу</a></p>
+{% endif %}
