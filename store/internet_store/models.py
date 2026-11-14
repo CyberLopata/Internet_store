@@ -109,8 +109,12 @@ class Product(models.Model):
             self.image.storage.delete(old_name)  # прибираємо старе фото
 
     def delete(self, *args, **kwargs):
+        photos = list(self.photos.all())
         image = self.image
         super().delete(*args, **kwargs)
+        for photo in photos:
+            if photo.image:
+                photo.image.storage.delete(photo.image.name)
         if image:
             image.storage.delete(image.name)
 
@@ -119,6 +123,42 @@ class Product(models.Model):
         if self.old_price and self.old_price > self.price:
             return round((1 - self.price / self.old_price) * 100)
         return 0
+
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(
+        Product, verbose_name="Товар", on_delete=models.CASCADE, related_name="photos"
+    )
+    image = models.ImageField(
+        "Фото", storage=product_image_storage, validators=[validate_image_size],
+        help_text="JPG, PNG, GIF або WebP до 10 МБ. Автоматично зберігається як WebP у static/images/.",
+    )
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    class Meta:
+        ordering = ["order", "pk"]
+        verbose_name = "Фото товару"
+        verbose_name_plural = "Фото товару"
+
+    def __str__(self):
+        return f"{self.product.name} — фото {self.order + 1}"
+
+    def save(self, *args, **kwargs):
+        old_name = None
+        if self.pk:
+            old_name = ProductImage.objects.filter(pk=self.pk).values_list("image", flat=True).first()
+        if self.image and not self.image._committed:
+            webp = to_webp(self.image.file, self.product.slug)
+            self.image.save(webp.name, webp, save=False)
+        super().save(*args, **kwargs)
+        if old_name and old_name != (self.image.name or ""):
+            self.image.storage.delete(old_name)
+
+    def delete(self, *args, **kwargs):
+        image = self.image
+        super().delete(*args, **kwargs)
+        if image:
+            image.storage.delete(image.name)
 
 
 class Order(models.Model):

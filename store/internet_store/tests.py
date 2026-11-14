@@ -2,7 +2,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Order, Product
+from .models import Order, Product, ProductImage
 
 
 class ShopFlowTests(TestCase):
@@ -72,6 +72,29 @@ class ShopFlowTests(TestCase):
 
 
 class ProductImageTests(TestCase):
+    def test_additional_images_are_rendered_in_product_gallery(self):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        from .models import Category
+
+        buf = BytesIO()
+        Image.new("RGB", (20, 20), "blue").save(buf, format="PNG")
+        category = Category.objects.create(name="Тест", slug="gallery-test")
+        product = Product.objects.create(
+            category=category, name="Галерея", slug="gallery-test", price=10,
+        )
+        photo = ProductImage.objects.create(
+            product=product,
+            image=SimpleUploadedFile("gallery.png", buf.getvalue(), content_type="image/png"),
+        )
+        try:
+            self.assertContains(self.client.get(product.get_absolute_url()), photo.image.url)
+        finally:
+            product.delete()
+
     def test_upload_is_converted_to_webp_in_static_images(self):
         from io import BytesIO
         from pathlib import Path

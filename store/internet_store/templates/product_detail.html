@@ -4,11 +4,20 @@
 <nav class="crumbs"><a href="{% url 'index' %}">Головна</a> › <a href="{% url 'catalog' %}">Каталог</a> › <a href="{{ product.category.get_absolute_url }}">{{ product.category.name }}</a> › {{ product.name }}</nav>
 
 <div class="pdp">
-  <div class="pgallery">
-    <div class="pimg{% if product.image %} has-img{% endif %}"{% if not product.image %} style="background:{{ product.color }}"{% endif %}>
+  <div class="pgallery" data-gallery>
+    <div class="pimg{% if gallery %} has-img{% endif %}"{% if not gallery %} style="background:{{ product.color }}"{% endif %}>
       {% if product.discount_percent %}<span class="pdisc">−{{ product.discount_percent }}%</span>{% endif %}
-      {% if product.image %}<img src="{{ product.image.url }}" alt="{{ product.name }}">{% else %}{{ product.emoji }}{% endif %}
+      {% if gallery %}<img src="{{ gallery.0 }}" alt="{{ product.name }}" data-gallery-main>{% else %}{{ product.emoji }}{% endif %}
+      {% if gallery|length > 1 %}
+      <button type="button" class="gnav prev" data-gallery-step="-1" aria-label="Попереднє фото">‹</button>
+      <button type="button" class="gnav next" data-gallery-step="1" aria-label="Наступне фото">›</button>
+      {% endif %}
     </div>
+    {% if gallery|length > 1 %}
+    <div class="gthumbs">
+      {% for url in gallery %}<button type="button" class="gthumb{% if forloop.first %} on{% endif %}" data-gallery-thumb data-src="{{ url }}" aria-label="Фото {{ forloop.counter }}"><img src="{{ url }}" alt="" loading="lazy"></button>{% endfor %}
+    </div>
+    {% endif %}
   </div>
 
   <div class="pinfo">

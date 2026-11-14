@@ -67,7 +67,13 @@ def catalog(request, slug=None):
 def product_detail(request, slug):
     product = get_object_or_404(Product.objects.select_related("category"), slug=slug, is_active=True)
     related = Product.objects.filter(category=product.category, is_active=True).exclude(pk=product.pk)[:4]
-    return render(request, "product_detail.html", {"product": product, "related": related})
+    gallery = [product.image.url] if product.image else []
+    gallery.extend(photo.image.url for photo in product.photos.all() if photo.image)
+    return render(request, "product_detail.html", {
+        "product": product,
+        "related": related,
+        "gallery": gallery,
+    })
 
 
 def _back(request, fallback="cart"):

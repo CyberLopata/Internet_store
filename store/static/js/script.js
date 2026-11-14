@@ -126,6 +126,42 @@
   if (mq && mq.addEventListener) mq.addEventListener("change", paint);
 })();
 
+/* Галерея фото на сторінці товару: мініатюри, стрілки, клавіші ←/→ і свайп. */
+(function () {
+  var box = document.querySelector("[data-gallery]");
+  if (!box) return;
+  var main = box.querySelector("[data-gallery-main]"),
+      thumbs = box.querySelectorAll("[data-gallery-thumb]");
+  if (!main || thumbs.length < 2) return;
+  var cur = 0, startX = null;
+
+  function show(i) {
+    cur = (i + thumbs.length) % thumbs.length;
+    main.src = thumbs[cur].dataset.src;
+    thumbs.forEach(function (t, j) {
+      t.classList.toggle("on", j === cur);
+      if (j === cur) t.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+  thumbs.forEach(function (t, j) {
+    t.addEventListener("click", function () { show(j); });
+  });
+  box.querySelectorAll("[data-gallery-step]").forEach(function (b) {
+    b.addEventListener("click", function () { show(cur + parseInt(b.dataset.galleryStep, 10)); });
+  });
+  box.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") show(cur - 1);
+    else if (e.key === "ArrowRight") show(cur + 1);
+  });
+  main.addEventListener("touchstart", function (e) { startX = e.touches[0].clientX; }, { passive: true });
+  main.addEventListener("touchend", function (e) {
+    if (startX === null) return;
+    var dx = e.changedTouches[0].clientX - startX;
+    startX = null;
+    if (Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1));
+  });
+})();
+
 /* Лічильник кількості на сторінці товару */
 document.querySelectorAll(".stepper").forEach(function (box) {
   var input = box.querySelector("input");
