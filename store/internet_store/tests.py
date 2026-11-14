@@ -2,7 +2,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Order, Product, ProductImage
+from .models import Order, Product, ProductImage, Review
 
 
 class ShopFlowTests(TestCase):
@@ -125,3 +125,42 @@ class ProductImageTests(TestCase):
         finally:
             p.delete()
         self.assertFalse(path.exists())
+
+
+class ReviewTests(TestCase):
+    def test_review_is_published_and_shown_after_submission(self):
+        from .models import Category
+
+        category = Category.objects.create(name="Відгуки", slug="review-test")
+        product = Product.objects.create(
+            category=category, name="Тестовий товар", slug="review-test", price=10,
+        )
+        response = self.client.post(product.get_absolute_url(), {
+            "name": "Іван",
+            "rating": "5",
+            "text": "Якісний товар",
+            "website": "",
+        })
+
+        self.assertRedirects(response, f"{product.get_absolute_url()}?reviewed=1#reviews")
+        review = Review.objects.get(product=product)
+        self.assertTrue(review.is_published)
+        self.assertEqual(review.stars, "★★★★★")
+        self.assertEqual(Product.objects.get(pk=product.pk).reviews_count, 1)
+        self.assertContains(self.client.get(product.get_absolute_url() + "?reviewed=1"), review.text)
+
+    def test_honeypot_submission_is_ignored(self):
+        from .models import Category
+
+        category = Category.objects.create(name="Відгуки", slug="review-spam-test")
+        product = Product.objects.create(
+            category=category, name="Тестовий товар", slug="review-spam-test", price=10,
+        )
+        self.client.post(product.get_absolute_url(), {
+            "name": "Bot",
+            "rating": "5",
+            "text": "Spam review",
+            "website": "http://example.invalid",
+        })
+
+        self.assertFalse(Review.objects.filter(product=product).exists())

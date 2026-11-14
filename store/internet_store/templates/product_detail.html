@@ -23,7 +23,7 @@
   <div class="pinfo">
     <a class="pcat" href="{{ product.category.get_absolute_url }}">{{ product.category.name }}</a>
     <h1>{{ product.name }}</h1>
-    {% if product.reviews_count %}<div class="rate">★★★★★ · {{ product.reviews_count }} відгуків</div>{% endif %}
+    {% if reviews_total %}<a class="rate" href="#reviews">★ {{ rating_avg|floatformat:1 }} · {{ reviews_total }} відгуків</a>{% elif product.reviews_count %}<div class="rate">★★★★★ · {{ product.reviews_count }} відгуків</div>{% endif %}
 
     <div class="pprice">
       <b>{{ product.price|floatformat:"0g" }} ₴</b>
@@ -49,6 +49,51 @@
     </ul>
   </div>
 </div>
+
+<section class="reviews" id="reviews">
+  <h2>Відгуки{% if reviews_total %} <span class="muted">· {{ reviews_total }}{% if rating_avg %} · ★ {{ rating_avg|floatformat:1 }}{% endif %}</span>{% endif %}</h2>
+  <div class="rv-layout">
+    <div class="rv-list">
+      {% for r in reviews %}
+      <article class="rv">
+        <div class="rv-head">
+          <b>{{ r.name }}</b>
+          <span class="rv-stars" role="img" aria-label="Оцінка {{ r.rating }} з 5">{{ r.stars }}</span>
+          <time class="muted" datetime="{{ r.created|date:'c' }}">{{ r.created|date:"d.m.Y" }}</time>
+        </div>
+        <p>{{ r.text|linebreaksbr }}</p>
+      </article>
+      {% empty %}
+      <p class="rv-empty muted">Поки що немає відгуків. Будьте першим!</p>
+      {% endfor %}
+    </div>
+
+    <form class="summary form rv-form" method="post" action="{{ product.get_absolute_url }}#reviews">{% csrf_token %}
+      <h3>Залишити відгук</h3>
+      {% if just_reviewed %}<div class="msg success" role="status">Дякуємо! Ваш відгук опубліковано.</div>{% endif %}
+      {% for e in form.non_field_errors %}<div class="err">{{ e }}</div>{% endfor %}
+      <div class="field">
+        <label for="{{ form.name.id_for_label }}">Ім'я</label>
+        {{ form.name }}
+        {% for e in form.name.errors %}<div class="err">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="field">
+        <span class="lbl">Оцінка</span>
+        <div class="star-input">
+          {% for v in "54321" %}<input type="radio" name="rating" id="star{{ v }}" value="{{ v }}" required{% if form.rating.value|stringformat:"s" == v %} checked{% endif %}><label for="star{{ v }}" title="{{ v }} з 5">★<span class="sr">{{ v }} з 5</span></label>{% endfor %}
+        </div>
+        {% for e in form.rating.errors %}<div class="err">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="field">
+        <label for="{{ form.text.id_for_label }}">Відгук</label>
+        {{ form.text }}
+        {% for e in form.text.errors %}<div class="err">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="hp" aria-hidden="true"><label>Сайт <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+      <button class="add" type="submit">Надіслати відгук</button>
+    </form>
+  </div>
+</section>
 
 {% if related %}
 <h2>Схожі товари</h2>

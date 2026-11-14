@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.db import transaction
 from django.core.paginator import Paginator
-from django.db.models import F, Q
+from django.db.models import Avg, Count, F, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -9,7 +9,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .cart import Cart
-from .forms import CheckoutForm
+from .forms import CheckoutForm, ReviewForm
 from .models import Category, Order, OrderItem, Product
 
 PAGE_SIZE = 12
@@ -67,12 +67,29 @@ def catalog(request, slug=None):
 def product_detail(request, slug):
     product = get_object_or_404(Product.objects.select_related("category"), slug=slug, is_active=True)
     related = Product.objects.filter(category=product.category, is_active=True).exclude(pk=product.pk)[:4]
+    form = ReviewForm(request.POST if request.method == "POST" else None)
+    just_reviewed = False
+    if request.method == "POST" and form.is_valid():
+        if form.cleaned_data["website"]:
+            return redirect(f"{product.get_absolute_url()}#reviews")
+        review = form.save(commit=False)
+        review.product = product
+        review.save()
+        return redirect(f"{product.get_absolute_url()}?reviewed=1#reviews")
+
     gallery = [product.image.url] if product.image else []
     gallery.extend(photo.image.url for photo in product.photos.all() if photo.image)
+    reviews = product.reviews.filter(is_published=True)
+    review_stats = reviews.aggregate(total=Count("pk"), average=Avg("rating"))
     return render(request, "product_detail.html", {
         "product": product,
         "related": related,
         "gallery": gallery,
+        "reviews": reviews,
+        "reviews_total": review_stats["total"],
+        "rating_avg": review_stats["average"],
+        "form": form,
+        "just_reviewed": request.GET.get("reviewed") == "1",
     })
 
 

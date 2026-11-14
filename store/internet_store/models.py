@@ -161,6 +161,50 @@ class ProductImage(models.Model):
             image.storage.delete(image.name)
 
 
+class Review(models.Model):
+    RATING_CHOICES = [(value, str(value)) for value in range(1, 6)]
+
+    product = models.ForeignKey(
+        Product, verbose_name="Товар", on_delete=models.CASCADE, related_name="reviews"
+    )
+    name = models.CharField("Ім'я", max_length=120)
+    rating = models.PositiveSmallIntegerField("Оцінка", choices=RATING_CHOICES)
+    text = models.TextField("Відгук")
+    is_published = models.BooleanField("Опублікований", default=True)
+    created = models.DateTimeField("Створено", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created", "pk"]
+        verbose_name = "Відгук"
+        verbose_name_plural = "Відгуки"
+
+    def __str__(self):
+        return f"{self.product.name} — {self.name} ({self.rating}/5)"
+
+    @property
+    def stars(self):
+        return "★" * self.rating + "☆" * (5 - self.rating)
+
+    @staticmethod
+    def _sync_product_count(product_id):
+        count = Review.objects.filter(product_id=product_id, is_published=True).count()
+        Product.objects.filter(pk=product_id).update(reviews_count=count)
+
+    def save(self, *args, **kwargs):
+        old_product_id = None
+        if self.pk:
+            old_product_id = Review.objects.filter(pk=self.pk).values_list("product_id", flat=True).first()
+        super().save(*args, **kwargs)
+        if old_product_id and old_product_id != self.product_id:
+            self._sync_product_count(old_product_id)
+        self._sync_product_count(self.product_id)
+
+    def delete(self, *args, **kwargs):
+        product_id = self.product_id
+        super().delete(*args, **kwargs)
+        self._sync_product_count(product_id)
+
+
 class Order(models.Model):
     class Status(models.TextChoices):
         NEW = "new", "Нове"

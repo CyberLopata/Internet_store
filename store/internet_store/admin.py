@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.db.models import Max
 from django.utils.html import format_html
 
-from .models import Category, Order, OrderItem, Product, ProductImage, validate_image_size
+from .models import Category, Order, OrderItem, Product, ProductImage, Review, validate_image_size
 
 
 class MultipleFileInput(forms.FileInput):
@@ -100,3 +100,18 @@ class OrderAdmin(admin.ModelAdmin):
     list_editable = ("status",)
     search_fields = ("name", "phone", "email")
     inlines = [OrderItemInline]
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ("created", "product", "name", "rating", "short_text", "is_published")
+    list_display_links = ("created", "product")
+    list_editable = ("is_published",)
+    list_filter = ("is_published", "rating", "created")
+    search_fields = ("name", "text", "product__name")
+    autocomplete_fields = ("product",)
+    date_hierarchy = "created"
+
+    @admin.display(description="Текст")
+    def short_text(self, obj):
+        return obj.text if len(obj.text) <= 60 else obj.text[:57] + "…"

@@ -165,6 +165,28 @@ a.add{display:block;text-align:center}
 .gthumb:hover{border-color:var(--muted)}
 .gthumb.on{border-color:var(--primary)}
 
+/* ---- Відгуки ---- */
+.reviews{margin-top:32px;scroll-margin-top:96px}
+.rv-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
+.rv{padding:16px 0;border-bottom:1px solid var(--border)}
+.rv:first-child{padding-top:0}
+.rv-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+.rv-stars{color:#f5a623;letter-spacing:1px}
+.rv time{font-size:13px}
+.rv p{margin:6px 0 0;overflow-wrap:anywhere}
+.rv-empty{margin:0}
+a.rate:hover{color:var(--primary)}
+.rv-form .msg{margin-bottom:14px}
+.rv-form .lbl{display:block;font-size:14px;font-weight:600;margin-bottom:4px}
+.form .star-input{display:inline-flex;flex-direction:row-reverse;gap:2px}
+.form .star-input input{position:absolute;opacity:0;width:1px;height:1px;padding:0;margin:0;pointer-events:none}
+.form .star-input label{display:block;margin:0;padding:0 2px;font-size:32px;line-height:1;font-weight:400;color:var(--border);cursor:pointer}
+.form .star-input input:checked ~ label,.form .star-input label:hover,.form .star-input label:hover ~ label{color:#f5a623}
+.form .star-input input:focus-visible + label{outline:2px solid var(--primary);outline-offset:2px;border-radius:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+@media(max-width:800px){.rv-layout{grid-template-columns:1fr}}
+
 /* ---- Висувний кошик ---- */
 .dclose{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:14px}
 .dclose:hover{border-color:var(--primary)}
