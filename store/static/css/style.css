@@ -76,6 +76,10 @@ footer{margin-top:40px;background:var(--surface);border-top:1px solid var(--bord
 @media(max-width:640px){.icons .t{display:none}.slide{padding:24px}}
 /* ---- Додаткові сторінки: каталог, товар, кошик, оформлення ---- */
 .ibtn{display:inline-block;text-decoration:none}
+.ibtn[hidden]{display:none}
+button.ibtn{font-family:inherit;line-height:inherit}
+body{transition:background-color .2s,color .2s}
+@media(prefers-reduced-motion:reduce){body{transition:none}}
 .name{display:block}
 .name:hover{color:var(--primary)}
 a.img{text-decoration:none}

@@ -60,6 +60,11 @@ class ShopFlowTests(TestCase):
         self.assertEqual(data["count"], 0)
         self.assertIn("порожній", data["html"])
 
+    def test_theme_toggle_is_rendered(self):
+        html = self.client.get(reverse("index")).content.decode()
+        self.assertIn("data-theme-toggle", html)
+        self.assertIn('localStorage.getItem("theme")', html)
+
     def test_success_page_is_private(self):
         order = Order.objects.create(name="x", phone="1", city="c", address="a")
         r = self.client.get(reverse("order_success", args=[order.pk]))

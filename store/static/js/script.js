@@ -96,6 +96,36 @@
   });
 })();
 
+/* Перемикач світлої/темної теми. Без збереженого вибору сайт іде за налаштуванням системи.
+   Збережена тема виставляється ще в <head> (див. base.html), щоб не було миготіння. */
+(function () {
+  var btn = document.querySelector("[data-theme-toggle]");
+  if (!btn) return;
+  var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null,
+      root = document.documentElement;
+
+  function current() {
+    var t = root.getAttribute("data-theme");
+    if (t === "dark" || t === "light") return t;
+    return mq && mq.matches ? "dark" : "light";
+  }
+  function paint() {
+    var dark = current() === "dark";
+    btn.textContent = dark ? "☀️" : "🌙"; // показуємо тему, на яку перейдемо
+    btn.setAttribute("aria-label", dark ? "Увімкнути світлу тему" : "Увімкнути темну тему");
+    btn.title = btn.getAttribute("aria-label");
+  }
+  btn.hidden = false;
+  paint();
+  btn.addEventListener("click", function () {
+    var next = current() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (e) {}
+    paint();
+  });
+  if (mq && mq.addEventListener) mq.addEventListener("change", paint);
+})();
+
 /* Лічильник кількості на сторінці товару */
 document.querySelectorAll(".stepper").forEach(function (box) {
   var input = box.querySelector("input");
