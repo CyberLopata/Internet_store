@@ -165,6 +165,24 @@ a.add{display:block;text-align:center}
 .gthumb:hover{border-color:var(--muted)}
 .gthumb.on{border-color:var(--primary)}
 
+/* ---- Збільшення фото (повноекранний перегляд) ---- */
+.pimg img.zoomable{cursor:zoom-in}
+.pimg .pdisc{pointer-events:none}
+.lb{position:fixed;inset:0;z-index:30;background:rgba(10,12,20,.92);animation:lb-in .2s}
+.lb[hidden],.lb [hidden]{display:none}
+.lb-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:64px 80px;touch-action:none}
+.lb-img{flex:none;max-width:none;object-fit:contain;background:#f8fafb;border-radius:12px;cursor:zoom-in;transition:transform .2s;user-select:none;-webkit-user-drag:none}
+.lb-img.zoomed{transform:scale(2);cursor:zoom-out}
+.lb-close,.lb-nav{position:absolute;z-index:1;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.4);background:rgba(20,24,36,.7);color:#fff;border-radius:50%;cursor:pointer;padding:0}
+.lb-close:hover,.lb-nav:hover{background:rgba(20,24,36,.95)}
+.lb-close{top:calc(12px + env(safe-area-inset-top,0px));right:12px;width:44px;height:44px;font-size:18px}
+.lb-nav{top:50%;transform:translateY(-50%);width:48px;height:48px;font-size:30px;line-height:1;padding-bottom:4px}
+.lb-nav.prev{left:16px}.lb-nav.next{right:16px}
+.lb-count{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#fff;font-size:14px;opacity:.85;pointer-events:none}
+@keyframes lb-in{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.lb{animation:none}.lb-img{transition:none}}
+@media(max-width:800px){.lb-stage{padding:64px 8px}.lb-nav{width:40px;height:40px;font-size:26px}.lb-nav.prev{left:8px}.lb-nav.next{right:8px}}
+
 /* ---- Відгуки ---- */
 .reviews{margin-top:32px;scroll-margin-top:96px}
 .rv-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}

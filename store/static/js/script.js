@@ -162,6 +162,148 @@
   });
 })();
 
+/* Збільшення фото товару: клік по фото відкриває повноекранний перегляд зі стрілками,
+   клавішами ←/→/Esc і свайпом. Клік по фото в перегляді збільшує його вдвічі
+   (далі фото рухається за курсором або пальцем), ще один клік повертає назад. */
+(function () {
+  var main = document.querySelector("[data-gallery-main]");
+  if (!main) return;
+  var gallery = main.closest("[data-gallery]"),
+      thumbs = gallery ? gallery.querySelectorAll("[data-gallery-thumb]") : [],
+      lb, stage, img, count, closeBtn, prevBtn, nextBtn,
+      urls = [], idx = 0, startIdx = 0, zoomed = false, baseRect = null,
+      startX = null, startY = 0, handled = false, lastFocus = null;
+
+  main.classList.add("zoomable");
+  main.tabIndex = 0;
+  main.setAttribute("role", "button");
+  main.setAttribute("aria-label", "Збільшити фото");
+
+  function build() {
+    lb = document.createElement("div");
+    lb.className = "lb";
+    lb.hidden = true;
+    lb.setAttribute("role", "dialog");
+    lb.setAttribute("aria-modal", "true");
+    lb.setAttribute("aria-label", "Перегляд фото");
+    lb.innerHTML =
+      '<div class="lb-stage"><img class="lb-img" alt="" draggable="false"></div>' +
+      '<button type="button" class="lb-close" aria-label="Закрити">✕</button>' +
+      '<button type="button" class="lb-nav prev" aria-label="Попереднє фото">‹</button>' +
+      '<button type="button" class="lb-nav next" aria-label="Наступне фото">›</button>' +
+      '<div class="lb-count" aria-live="polite"></div>';
+    document.body.appendChild(lb);
+    stage = lb.querySelector(".lb-stage");
+    img = lb.querySelector(".lb-img");
+    count = lb.querySelector(".lb-count");
+    closeBtn = lb.querySelector(".lb-close");
+    prevBtn = lb.querySelector(".lb-nav.prev");
+    nextBtn = lb.querySelector(".lb-nav.next");
+
+    lb.addEventListener("click", function (e) {
+      if (e.target === closeBtn) close();
+      else if (e.target === prevBtn) step(-1);
+      else if (e.target === nextBtn) step(1);
+      else if (handled) handled = false;        // дію вже виконано на pointerup (тап/свайп)
+      else if (e.target === img) toggleZoom(e);
+      else close();                             // клік по темному фону
+    });
+    img.addEventListener("load", fit);
+    window.addEventListener("resize", function () { if (!lb.hidden) { resetZoom(); fit(); } });
+    // Тап і свайп обробляємо на pointer-подіях: після свайпу деякі мобільні браузери не надсилають click.
+    lb.addEventListener("pointerdown", function (e) { startX = e.clientX; startY = e.clientY; handled = false; });
+    stage.addEventListener("pointermove", function (e) { if (zoomed) setOrigin(e); });
+    stage.addEventListener("pointerup", function (e) {
+      if (startX === null) return;
+      var dx = e.clientX - startX, dy = e.clientY - startY;
+      startX = null;
+      if (!zoomed && Math.abs(dx) > 50) { handled = true; step(dx < 0 ? 1 : -1); }
+      else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+        handled = true;
+        if (e.target === img) toggleZoom(e); else close(); // тап по фото збільшує, по темному фону закриває
+      }
+    });
+  }
+
+  function fit() { // вписуємо фото в екран, дрібні трохи збільшуємо (до ×3), щоб воно було більшим, ніж на сторінці
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) return;
+    var cs = getComputedStyle(stage),
+        aw = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+        ah = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom),
+        k = Math.min(3, aw / w, ah / h);
+    img.style.width = Math.round(w * k) + "px";
+    img.style.height = Math.round(h * k) + "px";
+  }
+  function setOrigin(e) {
+    var x = Math.min(1, Math.max(0, (e.clientX - baseRect.left) / baseRect.width)) * 100,
+        y = Math.min(1, Math.max(0, (e.clientY - baseRect.top) / baseRect.height)) * 100;
+    img.style.transformOrigin = x + "% " + y + "%";
+  }
+  function resetZoom() {
+    zoomed = false;
+    img.classList.remove("zoomed");
+    img.style.transformOrigin = "";
+  }
+  function toggleZoom(e) {
+    if (zoomed) { resetZoom(); return; }
+    baseRect = img.getBoundingClientRect();
+    zoomed = true;
+    setOrigin(e);
+    img.classList.add("zoomed");
+  }
+  function show(i) {
+    idx = (i + urls.length) % urls.length;
+    resetZoom();
+    img.src = urls[idx];
+    img.alt = main.alt;
+    count.textContent = urls.length > 1 ? (idx + 1) + " / " + urls.length : "";
+    if (urls.length > 1) { // підвантажуємо сусідні фото наперед
+      new Image().src = urls[(idx + 1) % urls.length];
+      new Image().src = urls[(idx - 1 + urls.length) % urls.length];
+    }
+  }
+  function step(d) {
+    if (urls.length > 1) show(idx + d);
+  }
+  function open() {
+    if (!lb) build();
+    urls = Array.prototype.map.call(thumbs, function (t) { return t.dataset.src; });
+    if (!urls.length) urls = [main.getAttribute("src")];
+    startIdx = Math.max(0, urls.indexOf(main.getAttribute("src")));
+    lastFocus = document.activeElement;
+    prevBtn.hidden = nextBtn.hidden = urls.length < 2;
+    lb.hidden = false;
+    document.body.style.overflow = "hidden";
+    show(startIdx);
+    closeBtn.focus();
+  }
+  function close() {
+    if (!lb || lb.hidden) return;
+    lb.hidden = true;
+    resetZoom();
+    document.body.style.overflow = "";
+    if (idx !== startIdx && thumbs[idx]) thumbs[idx].click(); // галерея на сторінці показує те саме фото
+    if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+  }
+
+  main.addEventListener("click", open);
+  main.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!lb || lb.hidden) return;
+    if (e.key === "Escape") close();
+    else if (e.key === "ArrowLeft") step(-1);
+    else if (e.key === "ArrowRight") step(1);
+    else if (e.key === "Tab") { // фокус не виходить за межі перегляду
+      var f = Array.prototype.filter.call(lb.querySelectorAll("button"), function (b) { return !b.hidden; });
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+})();
+
 /* Лічильник кількості на сторінці товару */
 document.querySelectorAll(".stepper").forEach(function (box) {
   var input = box.querySelector("input");
