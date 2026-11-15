@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Реєстрація — {{ SHOP.name }}{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>Реєстрація</h1>
+  <form method="post" class="form">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% include "partials/_form_fields.html" %}
+    <button class="add" type="submit">Створити акаунт</button>
+  </form>
+  <p class="auth-alt">Вже є акаунт? <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Увійти</a></p>
+</div>
+{% endblock %}

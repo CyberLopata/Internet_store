@@ -1,0 +1,6 @@
+<nav class="account-nav" aria-label="Особистий кабінет">
+  <a href="{% url 'account' %}"{% if section == "profile" %} class="on" aria-current="page"{% endif %}>👤 Мої дані</a>
+  <a href="{% url 'account_orders' %}"{% if section == "orders" %} class="on" aria-current="page"{% endif %}>📦 Мої замовлення</a>
+  <a href="{% url 'password_change' %}"{% if section == "password" %} class="on" aria-current="page"{% endif %}>🔒 Змінити пароль</a>
+  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">↪ Вийти</button></form>
+</nav>

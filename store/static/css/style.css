@@ -102,6 +102,7 @@ a.add{display:block;text-align:center}
 .messages{margin-top:16px;display:grid;gap:8px}
 .msg{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--primary);padding:10px 14px;border-radius:8px;font-size:14px}
 .msg.success{border-left-color:#12a37f}
+.msg.error{border-left-color:var(--accent)}
 .cart-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
 .crow{display:grid;grid-template-columns:64px 1fr auto auto auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .cimg{width:64px;height:64px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:30px;overflow:hidden;flex-shrink:0;border:1px solid var(--border)}
@@ -182,6 +183,45 @@ a.add{display:block;text-align:center}
 @keyframes lb-in{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.lb{animation:none}.lb-img{transition:none}}
 @media(max-width:800px){.lb-stage{padding:64px 8px}.lb-nav{width:40px;height:40px;font-size:26px}.lb-nav.prev{left:8px}.lb-nav.next{right:8px}}
+
+/* ---- Акаунт покупця ---- */
+.auth-card{max-width:440px;margin:24px auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px}
+.auth-card h1{margin:0 0 16px;font-size:26px}
+.auth-card .add{width:100%;padding:12px;margin-top:4px}
+.auth-alt{text-align:center;margin:14px 0 0;font-size:14px;color:var(--muted)}
+.auth-alt a,.linkish{color:var(--primary);text-decoration:underline;text-underline-offset:2px}
+.form .help{font-size:12px;color:var(--muted);margin-top:4px}
+.form .help ul{margin:4px 0 0;padding-left:18px}
+.account-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px;align-items:start;margin-top:8px}
+.account-nav{display:grid;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px}
+.account-nav a,.account-nav button{display:block;width:100%;text-align:left;padding:10px 12px;border-radius:8px;font-size:15px;font-weight:600;background:none;border:0;color:var(--text);cursor:pointer;font-family:inherit}
+.account-nav a:hover,.account-nav button:hover{background:var(--border)}
+.account-nav a.on{background:var(--primary);color:var(--primary-text)}
+.account-nav form{margin:0}
+.account-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:0}
+.account-card h2{margin:0 0 16px;font-size:20px;display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px}
+.account-card h3{margin:20px 0 6px;font-size:16px}
+.account-card .add{margin-top:6px;padding:10px 24px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.ord{display:grid;grid-template-columns:1fr auto auto;gap:4px 16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--border)}
+.ord:first-of-type{padding-top:0}
+.ord:last-child{border-bottom:0}
+.ord:hover .num{color:var(--primary)}
+.ord .num{font-weight:700}
+.ord .sum{font-weight:700;text-align:right;min-width:80px}
+.badge-st{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px 2px 8px;border-radius:12px;background:var(--bg);border:1px solid var(--border);color:var(--text)}
+.badge-st::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--dot,#6b7285)}
+.st-new{--dot:#2f4fd8}.st-confirmed{--dot:#f5a623}.st-shipped{--dot:#7a5cff}.st-done{--dot:#12a37f}.st-canceled{--dot:#e5484d}
+.account-card .summary{background:var(--bg)}
+.account-card .srow a{color:var(--primary)}
+@media(max-width:800px){
+  .account-layout{grid-template-columns:1fr}
+  .account-nav{display:flex;flex-wrap:wrap}
+  .account-nav a,.account-nav button{width:auto}
+  .form-grid{grid-template-columns:1fr}
+  .ord{grid-template-columns:1fr auto}
+  .ord .badge-st{grid-column:1/-1;justify-self:start;grid-row:2}
+}
 
 /* ---- Відгуки ---- */
 .reviews{margin-top:32px;scroll-margin-top:96px}

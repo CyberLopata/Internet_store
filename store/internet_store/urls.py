@@ -1,6 +1,8 @@
+from django.contrib.auth.views import LogoutView
 from django.urls import path
 from django.views.generic import TemplateView
 
+from . import account_views as acc
 from . import views
 
 urlpatterns = [
@@ -16,6 +18,18 @@ urlpatterns = [
     path("cart/remove/<int:pk>/", views.cart_remove, name="cart_remove"),
     path("checkout/", views.checkout, name="checkout"),
     path("order/<int:pk>/success/", views.order_success, name="order_success"),
+
+    path("account/", acc.account, name="account"),
+    path("account/register/", acc.register, name="register"),
+    path("account/login/", acc.login_view, name="login"),
+    path("account/logout/", LogoutView.as_view(), name="logout"),
+    path("account/orders/", acc.orders, name="account_orders"),
+    path("account/orders/<int:pk>/", acc.order_detail, name="account_order"),
+    path("account/password/", acc.PasswordChange.as_view(), name="password_change"),
+    path("account/password-reset/", acc.PasswordReset.as_view(), name="password_reset"),
+    path("account/password-reset/sent/", acc.PasswordResetDone.as_view(), name="password_reset_done"),
+    path("account/reset/done/", acc.PasswordResetComplete.as_view(), name="password_reset_complete"),
+    path("account/reset/<uidb64>/<token>/", acc.PasswordResetConfirm.as_view(), name="password_reset_confirm"),
 
     path("about/", TemplateView.as_view(template_name="pages/about.html"), name="about"),
     path("delivery/", TemplateView.as_view(template_name="pages/delivery.html"), name="delivery"),

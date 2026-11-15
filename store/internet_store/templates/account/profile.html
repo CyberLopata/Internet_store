@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Мої дані — {{ SHOP.name }}{% endblock %}
+{% block content %}
+<h1 class="ptitle">Особистий кабінет</h1>
+<div class="account-layout">
+  {% include "partials/_account_nav.html" %}
+  <section class="account-card">
+    <h2>Мої дані</h2>
+    <form method="post" class="form">{% csrf_token %}
+      {% for e in form.non_field_errors %}<div class="err">{{ e }}</div>{% endfor %}
+      <div class="form-grid">
+        {% include "partials/_field.html" with field=form.first_name %}
+        {% include "partials/_field.html" with field=form.last_name %}
+        {% include "partials/_field.html" with field=form.email %}
+        {% include "partials/_field.html" with field=form.phone %}
+        {% include "partials/_field.html" with field=form.city %}
+        {% include "partials/_field.html" with field=form.address %}
+      </div>
+      <button class="add" type="submit">Зберегти</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

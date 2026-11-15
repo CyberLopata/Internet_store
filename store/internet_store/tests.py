@@ -164,3 +164,133 @@ class ReviewTests(TestCase):
         })
 
         self.assertFalse(Review.objects.filter(product=product).exists())
+
+
+class AccountTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_shop", verbosity=0)
+
+    def register(self, email="Anna@Example.com", pw="Str0ng-pass-91"):
+        return self.client.post(reverse("register"), {
+            "first_name": "Анна", "email": email, "phone": "+380501112233",
+            "password1": pw, "password2": pw,
+        })
+
+    def test_register_logs_in_and_creates_profile(self):
+        r = self.register()
+        self.assertRedirects(r, reverse("account"))
+        from django.contrib.auth import get_user_model
+        u = get_user_model().objects.get(username="anna@example.com")
+        self.assertEqual(u.profile.phone, "+380501112233")
+        self.assertEqual(int(self.client.session["_auth_user_id"]), u.pk)
+
+    def test_duplicate_email_case_insensitive(self):
+        self.register()
+        self.client.logout()
+        r = self.register(email="ANNA@example.com")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "уже існує")
+
+    def test_weak_password_and_mismatch(self):
+        r = self.register(pw="12345678")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_honeypot_creates_nothing(self):
+        from django.contrib.auth import get_user_model
+        self.client.post(reverse("register"), {
+            "first_name": "Bot", "email": "bot@example.com", "password1": "Str0ng-pass-91",
+            "password2": "Str0ng-pass-91", "website": "http://spam"})
+        self.assertFalse(get_user_model().objects.filter(email="bot@example.com").exists())
+
+    def test_login_by_email_any_case_and_wrong_password(self):
+        self.register()
+        self.client.logout()
+        bad = self.client.post(reverse("login"), {"username": "anna@example.com", "password": "nope"})
+        self.assertContains(bad, "Невірний email або пароль")
+        ok = self.client.post(reverse("login"), {"username": "ANNA@example.com", "password": "Str0ng-pass-91"})
+        self.assertRedirects(ok, reverse("account"))
+
+    def test_login_next_safe_and_open_redirect_blocked(self):
+        self.register()
+        self.client.logout()
+        data = {"username": "anna@example.com", "password": "Str0ng-pass-91"}
+        r = self.client.post(reverse("login") + "?next=/cart/", data)
+        self.assertRedirects(r, "/cart/", fetch_redirect_response=False)
+        self.client.logout()
+        r = self.client.post(reverse("login") + "?next=https://evil.com/", data)
+        self.assertRedirects(r, reverse("account"), fetch_redirect_response=False)
+
+    def test_protected_pages_redirect_to_login(self):
+        for name in ("account", "account_orders", "password_change"):
+            r = self.client.get(reverse(name))
+            self.assertEqual(r.status_code, 302)
+            self.assertIn(reverse("login"), r["Location"])
+
+    def test_logout_is_post_only(self):
+        self.register()
+        self.assertEqual(self.client.get(reverse("logout")).status_code, 405)
+        self.client.post(reverse("logout"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_checkout_as_user_links_order_and_prefills(self):
+        self.register()
+        p = Product.objects.first()
+        self.client.post(reverse("cart_add", args=[p.pk]))
+        page = self.client.get(reverse("checkout"))
+        self.assertContains(page, "+380501112233")
+        r = self.client.post(reverse("checkout"), {
+            "name": "Анна", "phone": "+380501112233", "email": "anna@example.com",
+            "city": "Київ", "address": "Відділення 5", "comment": ""})
+        self.assertEqual(r.status_code, 302)
+        order = Order.objects.get()
+        self.assertEqual(order.user.username, "anna@example.com")
+        order.user.profile.refresh_from_db()
+        self.assertEqual(order.user.profile.city, "Київ")
+        self.assertContains(self.client.get(reverse("account_orders")), f"№{order.pk}")
+
+    def test_guest_checkout_still_works(self):
+        p = Product.objects.first()
+        self.client.post(reverse("cart_add", args=[p.pk]))
+        r = self.client.post(reverse("checkout"), {
+            "name": "Гість", "phone": "+380991112233", "email": "", "city": "Львів",
+            "address": "Склад 1", "comment": ""})
+        self.assertEqual(r.status_code, 302)
+        self.assertIsNone(Order.objects.get().user)
+
+    def test_cannot_view_other_users_order(self):
+        self.register()
+        p = Product.objects.first()
+        self.client.post(reverse("cart_add", args=[p.pk]))
+        self.client.post(reverse("checkout"), {
+            "name": "Анна", "phone": "1", "email": "", "city": "К", "address": "А", "comment": ""})
+        order = Order.objects.get()
+        self.client.logout()
+        self.register(email="bob@example.com")
+        self.assertEqual(self.client.get(reverse("account_order", args=[order.pk])).status_code, 404)
+
+    def test_profile_update_and_email_conflict(self):
+        self.register()
+        self.client.logout()
+        self.register(email="bob@example.com")
+        r = self.client.post(reverse("account"), {
+            "first_name": "Bob", "last_name": "", "email": "anna@example.com",
+            "phone": "", "city": "", "address": ""})
+        self.assertContains(r, "іншим акаунтом")
+        r = self.client.post(reverse("account"), {
+            "first_name": "Bob", "last_name": "B", "email": "bob2@example.com",
+            "phone": "1", "city": "К", "address": "А"})
+        self.assertRedirects(r, reverse("account"))
+        from django.contrib.auth import get_user_model
+        self.assertTrue(get_user_model().objects.filter(username="bob2@example.com").exists())
+
+    def test_password_change_and_reset_email(self):
+        from django.core import mail
+        self.register()
+        r = self.client.post(reverse("password_change"), {
+            "old_password": "Str0ng-pass-91", "new_password1": "Another-pass-77", "new_password2": "Another-pass-77"})
+        self.assertRedirects(r, reverse("account"))
+        self.client.post(reverse("password_reset"), {"email": "anna@example.com"})
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("/account/reset/", mail.outbox[0].body)

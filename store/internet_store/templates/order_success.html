@@ -9,6 +9,7 @@
     {% for i in order.items.all %}<div class="srow"><span>{{ i.product_name }} × {{ i.quantity }}</span><span>{{ i.subtotal|floatformat:"0g" }} ₴</span></div>{% endfor %}
     <div class="total"><span>Разом</span><span>{{ order.total|floatformat:"0g" }} ₴</span></div>
   </div>
+  {% if user.is_authenticated and order.user_id == user.pk %}<a class="cta-outline" href="{% url 'account_order' order.pk %}">Переглянути в кабінеті</a> {% endif %}
   <a class="cta-outline" href="{% url 'index' %}">На головну</a>
 </div>
 {% endblock %}

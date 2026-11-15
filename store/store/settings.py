@@ -147,3 +147,20 @@ WHITENOISE_AUTOREFRESH = True
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ---- Акаунти покупців ----
+AUTHENTICATION_BACKENDS = ['internet_store.backends.EmailOrUsernameBackend']
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'account'
+LOGOUT_REDIRECT_URL = 'index'
+
+# Листи (відновлення пароля). За замовчуванням друкуються в консоль/лог сервера.
+# Для реальної відправки: EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend + EMAIL_HOST* змінні.
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '0') == '1'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'SHOP <noreply@shop.example>')

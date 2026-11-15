@@ -2,6 +2,11 @@
 {% block title %}Оформлення замовлення — {{ SHOP.name }}{% endblock %}
 {% block content %}
 <h1 class="ptitle">Оформлення замовлення</h1>
+{% if user.is_authenticated %}
+<p class="muted">Замовлення збережеться в <a class="linkish" href="{% url 'account_orders' %}">вашому кабінеті</a>, а дані підставлено з профілю.</p>
+{% else %}
+<p class="muted">Вже є акаунт? <a class="linkish" href="{% url 'login' %}?next={% url 'checkout' %}">Увійдіть</a>, щоб підставити свої дані й бачити історію замовлень. Або оформіть замовлення без реєстрації.</p>
+{% endif %}
 <div class="cart-layout">
   <form method="post" class="form">{% csrf_token %}
     {{ form.non_field_errors }}

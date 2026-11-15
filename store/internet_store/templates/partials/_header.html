@@ -7,6 +7,11 @@
   </form>
   <div class="icons">
     <button type="button" class="ibtn" data-theme-toggle aria-label="Змінити тему" title="Змінити тему" hidden>🌙</button>
+    {% if user.is_authenticated %}
+    <a class="ibtn" href="{% url 'account' %}" title="Особистий кабінет">👤 <span class="t">{{ user.first_name|default:user.username|truncatechars:12 }}</span></a>
+    {% else %}
+    <a class="ibtn" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">👤 <span class="t">Увійти</span></a>
+    {% endif %}
     <a class="ibtn" href="{% url 'cart' %}" data-cart-open>🛒 <span class="t">Кошик</span><span class="badge" data-cart-count{% if not cart_count %} hidden{% endif %}>{{ cart_count }}</span></a>
   </div>
 </div></header>

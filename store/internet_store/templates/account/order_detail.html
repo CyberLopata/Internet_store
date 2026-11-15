@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Замовлення №{{ order.pk }} — {{ SHOP.name }}{% endblock %}
+{% block content %}
+<h1 class="ptitle">Особистий кабінет</h1>
+<div class="account-layout">
+  {% include "partials/_account_nav.html" %}
+  <section class="account-card">
+    <h2>Замовлення №{{ order.pk }} <span class="badge-st st-{{ order.status }}">{{ order.get_status_display }}</span></h2>
+    <p class="muted">Оформлено {{ order.created|date:"d.m.Y H:i" }}</p>
+    <div class="summary">
+      {% for i in order.items.all %}
+      <div class="srow"><span>{% if i.product %}<a href="{{ i.product.get_absolute_url }}">{{ i.product_name }}</a>{% else %}{{ i.product_name }}{% endif %} × {{ i.quantity }}</span><span>{{ i.subtotal|floatformat:"0g" }} ₴</span></div>
+      {% endfor %}
+      <div class="total"><span>Разом</span><span>{{ order.total|floatformat:"0g" }} ₴</span></div>
+    </div>
+    <h3>Доставка</h3>
+    <p>{{ order.name }}, {{ order.phone }}<br>{{ order.city }}, {{ order.address }}</p>
+    {% if order.comment %}<h3>Коментар</h3><p>{{ order.comment|linebreaksbr }}</p>{% endif %}
+    <p><a class="back" href="{% url 'account_orders' %}">← До всіх замовлень</a></p>
+  </section>
+</div>
+{% endblock %}

@@ -7,6 +7,8 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.urls import reverse
 from PIL import Image, ImageOps
 
@@ -213,6 +215,10 @@ class Order(models.Model):
         DONE = "done", "Виконане"
         CANCELED = "canceled", "Скасоване"
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="Покупець", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="orders",
+    )
     name = models.CharField("Ім'я", max_length=120)
     phone = models.CharField("Телефон", max_length=32)
     email = models.EmailField("Email", blank=True)
@@ -246,3 +252,33 @@ class OrderItem(models.Model):
     @property
     def subtotal(self):
         return self.price * self.quantity
+
+
+class Profile(models.Model):
+    """Додаткові дані покупця: телефон і адреса доставки за замовчуванням."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, verbose_name="Користувач", on_delete=models.CASCADE, related_name="profile"
+    )
+    phone = models.CharField("Телефон", max_length=32, blank=True)
+    city = models.CharField("Місто", max_length=120, blank=True)
+    address = models.CharField("Адреса / відділення", max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "Профіль покупця"
+        verbose_name_plural = "Профілі покупців"
+
+    def __str__(self):
+        return f"Профіль: {self.user}"
+
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_profile(sender, instance, created, **kwargs):
+    if created:
+        Profile.objects.get_or_create(user=instance)
+
+
+def get_profile(user):
+    """Профіль користувача; для акаунтів, створених до появи профілів, створюється на льоту."""
+    profile, _ = Profile.objects.get_or_create(user=user)
+    return profile

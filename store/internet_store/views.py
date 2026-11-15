@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 
 from .cart import Cart
 from .forms import CheckoutForm, ReviewForm
-from .models import Category, Order, OrderItem, Product
+from .models import Category, Order, OrderItem, Product, get_profile
 
 PAGE_SIZE = 12
 
@@ -67,7 +67,8 @@ def catalog(request, slug=None):
 def product_detail(request, slug):
     product = get_object_or_404(Product.objects.select_related("category"), slug=slug, is_active=True)
     related = Product.objects.filter(category=product.category, is_active=True).exclude(pk=product.pk)[:4]
-    form = ReviewForm(request.POST if request.method == "POST" else None)
+    initial = {"name": request.user.first_name} if request.user.is_authenticated else None
+    form = ReviewForm(request.POST if request.method == "POST" else None, initial=initial)
     just_reviewed = False
     if request.method == "POST" and form.is_valid():
         if form.cleaned_data["website"]:
@@ -159,16 +160,40 @@ def cart_remove(request, pk):
     return redirect("cart")
 
 
+def _checkout_initial(user):
+    """Дані покупця для автозаповнення форми оформлення."""
+    profile = get_profile(user)
+    return {
+        "name": user.get_full_name() or user.first_name, "phone": profile.phone, "email": user.email,
+        "city": profile.city, "address": profile.address,
+    }
+
+
+def _remember_delivery(user, order):
+    """Запам'ятовує телефон і адресу в профілі, якщо там ці поля ще порожні."""
+    profile = get_profile(user)
+    changed = []
+    for field in ("phone", "city", "address"):
+        if not getattr(profile, field) and getattr(order, field):
+            setattr(profile, field, getattr(order, field))
+            changed.append(field)
+    if changed:
+        profile.save(update_fields=changed)
+
+
 def checkout(request):
     cart = Cart(request)
     items = list(cart.items())
     if not items:
         messages.info(request, "Кошик порожній")
         return redirect("catalog")
-    form = CheckoutForm(request.POST or None)
+    initial = _checkout_initial(request.user) if request.user.is_authenticated else None
+    form = CheckoutForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             order = form.save(commit=False)
+            if request.user.is_authenticated:
+                order.user = request.user
             order.total = sum(i["subtotal"] for i in items)
             order.save()
             OrderItem.objects.bulk_create([
@@ -176,6 +201,8 @@ def checkout(request):
                           price=i["product"].price, quantity=i["quantity"])
                 for i in items
             ])
+        if request.user.is_authenticated:
+            _remember_delivery(request.user, order)
         cart.clear()
         request.session["last_order"] = order.pk
         return redirect("order_success", pk=order.pk)

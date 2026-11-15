@@ -1,9 +1,13 @@
 from django import forms
 from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin
 from django.db.models import Max
 from django.utils.html import format_html
 
-from .models import Category, Order, OrderItem, Product, ProductImage, Review, validate_image_size
+from .models import Category, Order, OrderItem, Product, ProductImage, Profile, Review, validate_image_size
+
+User = get_user_model()
 
 
 class MultipleFileInput(forms.FileInput):
@@ -95,10 +99,11 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "phone", "city", "address", "total", "status", "created")
+    list_display = ("id", "name", "phone", "city", "address", "user", "total", "status", "created")
     list_filter = ("status", "created")
     list_editable = ("status",)
-    search_fields = ("name", "phone", "email")
+    search_fields = ("name", "phone", "email", "user__email")
+    raw_id_fields = ("user",)
     inlines = [OrderItemInline]
 
 
@@ -115,3 +120,22 @@ class ReviewAdmin(admin.ModelAdmin):
     @admin.display(description="Текст")
     def short_text(self, obj):
         return obj.text if len(obj.text) <= 60 else obj.text[:57] + "…"
+
+
+class ProfileInline(admin.StackedInline):
+    model = Profile
+    can_delete = False
+    verbose_name_plural = "Профіль покупця"
+
+
+admin.site.unregister(User)
+
+
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    list_display = ("username", "email", "first_name", "last_name", "is_staff", "date_joined")
+    inlines = [ProfileInline]
+
+    def get_inline_instances(self, request, obj=None):
+        # На сторінці створення профіль додається автоматично (сигналом), тому вбудовану форму не показуємо.
+        return super().get_inline_instances(request, obj) if obj else []

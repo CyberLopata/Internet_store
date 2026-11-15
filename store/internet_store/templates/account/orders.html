@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Мої замовлення — {{ SHOP.name }}{% endblock %}
+{% block content %}
+<h1 class="ptitle">Особистий кабінет</h1>
+<div class="account-layout">
+  {% include "partials/_account_nav.html" %}
+  <section class="account-card">
+    <h2>Мої замовлення</h2>
+    {% for o in orders %}
+    <a class="ord" href="{% url 'account_order' o.pk %}">
+      <span><span class="num">Замовлення №{{ o.pk }}</span><br><span class="muted">{{ o.created|date:"d.m.Y H:i" }} · позицій: {{ o.items.all|length }}</span></span>
+      <span class="badge-st st-{{ o.status }}">{{ o.get_status_display }}</span>
+      <span class="sum">{{ o.total|floatformat:"0g" }} ₴</span>
+    </a>
+    {% empty %}
+    <p class="muted">Ви ще не робили замовлень.</p>
+    <p><a class="cta-outline" href="{% url 'catalog' %}">Перейти до каталогу</a></p>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}
