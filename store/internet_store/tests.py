@@ -294,3 +294,94 @@ class AccountTests(TestCase):
         self.client.post(reverse("password_reset"), {"email": "anna@example.com"})
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("/account/reset/", mail.outbox[0].body)
+
+
+class ChatTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_shop", verbosity=0)
+        from django.contrib.auth import get_user_model
+        cls.staff = get_user_model().objects.create_user("seller", "s@example.com", "Seller-pass-1", is_staff=True)
+
+    def send(self, client, text="Чи є 42 розмір?", **extra):
+        return client.post(reverse("chat_send"), {"text": text, **extra})
+
+    def test_guest_conversation_roundtrip(self):
+        p = Product.objects.first()
+        r = self.send(self.client, product=p.pk)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["message"]["product"]["url"], p.get_absolute_url())
+        # продавець відповідає
+        from .models import ChatThread
+        t = ChatThread.objects.get()
+        seller = self.client_class()
+        seller.force_login(self.staff)
+        self.assertEqual(seller.post(reverse("seller_chat_send", args=[t.pk]), {"text": "Так, є!"}).status_code, 200)
+        data = self.client.get(reverse("chat_messages") + "?after=0").json()
+        self.assertEqual([m["seller"] for m in data["messages"]], [False, True])
+        self.assertEqual(data["unread"], 1)
+        data = self.client.get(reverse("chat_messages") + "?after=0&open=1").json()
+        self.assertEqual(self.client.get(reverse("chat_messages") + "?after=2").json()["unread"], 0)
+
+    def test_empty_and_long_messages(self):
+        self.assertEqual(self.send(self.client, text="   ").status_code, 400)
+        r = self.send(self.client, text="я" * 3000)
+        self.assertEqual(len(r.json()["message"]["text"]), 1000)
+
+    def test_rate_limit(self):
+        codes = [self.send(self.client, text=f"m{i}").status_code for i in range(12)]
+        self.assertEqual(codes.count(200), 10)
+        self.assertEqual(codes[-1], 429)
+
+    def test_threads_are_isolated(self):
+        self.send(self.client)
+        other = self.client_class()
+        self.assertEqual(other.get(reverse("chat_messages")).json()["messages"], [])
+
+    def test_guest_thread_moves_to_account_on_login(self):
+        from django.contrib.auth import get_user_model
+        from .models import ChatThread
+        self.send(self.client)
+        u = get_user_model().objects.create_user("c@example.com", "c@example.com", "Cust-pass-1234")
+        self.client.force_login(u)
+        self.assertEqual(len(self.client.get(reverse("chat_messages")).json()["messages"]), 1)
+        self.assertEqual(ChatThread.objects.get().user, u)
+
+    def test_seller_pages_staff_only(self):
+        self.send(self.client)
+        from .models import ChatThread
+        t = ChatThread.objects.get()
+        urls = [reverse("seller_chat"), reverse("seller_chat_thread", args=[t.pk]),
+                reverse("seller_chat_messages", args=[t.pk])]
+        for u in urls:
+            self.assertEqual(self.client.get(u).status_code, 302)  # гість → вхід
+        from django.contrib.auth import get_user_model
+        u = get_user_model().objects.create_user("x@example.com", "x@example.com", "Cust-pass-1234")
+        self.client.force_login(u)
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.post(reverse("seller_chat_send", args=[t.pk]), {"text": "hi"}).status_code, 403)
+
+    def test_seller_read_marks_and_inbox(self):
+        self.send(self.client)
+        from .models import ChatThread
+        t = ChatThread.objects.get()
+        s = self.client_class()
+        s.force_login(self.staff)
+        self.assertContains(s.get(reverse("seller_chat")), "нових: 1")
+        s.get(reverse("seller_chat_messages", args=[t.pk]))
+        self.assertNotContains(s.get(reverse("seller_chat")), "нових:")
+
+    def test_widget_and_ask_button_rendered(self):
+        p = Product.objects.first()
+        self.assertContains(self.client.get(p.get_absolute_url()), "data-chat-open")
+        self.assertContains(self.client.get(reverse("index")), 'id="chat-widget"')
+        self.assertContains(self.client.get(reverse("index")), "chat.js")
+
+    def test_xss_text_is_stored_raw_and_returned_as_json(self):
+        r = self.send(self.client, text="<script>alert(1)</script>")
+        self.assertEqual(r.json()["message"]["text"], "<script>alert(1)</script>")
+        from .models import ChatThread
+        s = self.client_class()
+        s.force_login(self.staff)
+        self.assertNotContains(s.get(reverse("seller_chat")), "<script>alert(1)")

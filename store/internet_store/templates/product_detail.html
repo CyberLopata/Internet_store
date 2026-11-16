@@ -43,6 +43,8 @@
       <button class="add" type="submit">Додати до кошика</button>
     </form>
 
+    <p class="ask"><button type="button" class="cta-outline" data-chat-open data-product-id="{{ product.pk }}" data-product-name="{{ product.name }}">💬 Запитати продавця (наприклад, про розмір чи наявність)</button></p>
+
     <ul class="guarantees">
       <li>🚚 <span>Нова пошта по всій Україні, безкоштовно від {{ SHOP.free_delivery_from }} ₴. <a href="{% url 'delivery' %}">Доставка та оплата</a></span></li>
       <li>↩️ <span>Повернення протягом 14 днів. <a href="{% url 'returns' %}">Умови повернення</a></span></li>

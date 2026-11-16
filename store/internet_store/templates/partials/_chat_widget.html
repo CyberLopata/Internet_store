@@ -1,0 +1,22 @@
+<div class="chatw" id="chat-widget" data-side="customer"
+     data-messages-url="{% url 'chat_messages' %}" data-send-url="{% url 'chat_send' %}">
+  <button type="button" class="chat-fab" data-chat-toggle aria-label="Чат з продавцем" aria-expanded="false">
+    <span aria-hidden="true">💬</span><span class="fab-t">Чат з продавцем</span>
+    <span class="badge" data-chat-badge hidden>0</span>
+  </button>
+  <section class="chat-panel" data-chat-panel role="dialog" aria-label="Чат з продавцем" hidden>
+    <header><span>💬 Чат з продавцем</span>
+      <button type="button" class="dclose" data-chat-close aria-label="Закрити чат">✕</button></header>
+    <div class="chatbox">
+      <div class="cm-list" aria-live="polite">
+        <p class="cm-empty">Напишіть нам: підкажемо з розміром, наявністю чи оформленням замовлення. Зазвичай відповідаємо протягом дня.</p>
+      </div>
+      <div class="cm-attach" data-chat-attach hidden><span>🛍 <b data-chat-attach-name></b></span><button type="button" data-chat-attach-clear aria-label="Прибрати товар">✕</button></div>
+      <p class="cm-err" role="alert" hidden></p>
+      <form class="cm-form" novalidate>{% csrf_token %}
+        <textarea name="text" rows="1" maxlength="1000" placeholder="Ваше повідомлення…" aria-label="Повідомлення"></textarea>
+        <button class="cm-send" type="submit" aria-label="Надіслати">➤</button>
+      </form>
+    </div>
+  </section>
+</div>

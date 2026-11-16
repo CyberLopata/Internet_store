@@ -5,7 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.db.models import Max
 from django.utils.html import format_html
 
-from .models import Category, Order, OrderItem, Product, ProductImage, Profile, Review, validate_image_size
+from .models import Category, ChatMessage, ChatThread, Order, OrderItem, Product, ProductImage, Profile, Review, validate_image_size
 
 User = get_user_model()
 
@@ -139,3 +139,16 @@ class CustomUserAdmin(UserAdmin):
     def get_inline_instances(self, request, obj=None):
         # На сторінці створення профіль додається автоматично (сигналом), тому вбудовану форму не показуємо.
         return super().get_inline_instances(request, obj) if obj else []
+
+
+class ChatMessageInline(admin.TabularInline):
+    model = ChatMessage
+    extra = 0
+    readonly_fields = ("created",)
+
+
+@admin.register(ChatThread)
+class ChatThreadAdmin(admin.ModelAdmin):
+    list_display = ("id", "customer_name", "updated")
+    raw_id_fields = ("user",)
+    inlines = [ChatMessageInline]

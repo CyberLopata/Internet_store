@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Чат: {{ thread.customer_name }} — {{ SHOP.name }}{% endblock %}
+{% block chat %}{% endblock %}
+{% block content %}
+<p><a class="linkish" href="{% url 'seller_chat' %}">← Усі чати</a></p>
+<h1 class="ptitle">{{ thread.customer_name }}</h1>
+<p class="muted">{% if thread.user %}{{ thread.user.email }}{% if thread.user.profile.phone %} · {{ thread.user.profile.phone }}{% endif %}{% else %}Гість (без акаунта){% endif %}</p>
+{% if orders %}<p class="muted">Замовлення: {% for o in orders %}<a class="linkish" href="{% url 'admin:internet_store_order_change' o.pk %}">№{{ o.pk }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+<div class="chatpage chatbox" data-side="seller" data-poll="1"
+     data-messages-url="{% url 'seller_chat_messages' thread.pk %}" data-send-url="{% url 'seller_chat_send' thread.pk %}">
+  <div class="cm-list" aria-live="polite"></div>
+  <p class="cm-err" role="alert" hidden></p>
+  <form class="cm-form" novalidate>{% csrf_token %}
+    <textarea name="text" rows="2" maxlength="1000" placeholder="Ваша відповідь…" aria-label="Відповідь"></textarea>
+    <button class="cm-send" type="submit" aria-label="Надіслати">➤</button>
+  </form>
+</div>
+{% endblock %}

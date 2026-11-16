@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Чати з покупцями — {{ SHOP.name }}{% endblock %}
+{% block chat %}{% endblock %}
+{% block extra_head %}<meta http-equiv="refresh" content="30">{% endblock %}
+{% block content %}
+<h1 class="ptitle">Чати з покупцями</h1>
+<section class="account-card">
+  {% for it in items %}
+  <a class="ord" href="{% url 'seller_chat_thread' it.thread.pk %}">
+    <span><span class="num">{{ it.thread.customer_name }}</span>{% if it.unread %} <span class="badge-st st-new">нових: {{ it.unread }}</span>{% endif %}<br>
+      <span class="muted">{% if it.last.seller %}Ви: {% endif %}{{ it.last.text|truncatechars:90 }}</span></span>
+    <span class="muted">{{ it.thread.updated|date:"d.m H:i" }}</span>
+  </a>
+  {% empty %}<p class="muted">Повідомлень поки немає.</p>{% endfor %}
+</section>
+{% endblock %}

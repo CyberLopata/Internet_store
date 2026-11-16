@@ -163,4 +163,5 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '25'))
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '0') == '1'
+SELLER_NOTIFY_EMAIL = os.environ.get('SELLER_NOTIFY_EMAIL', '')  # куди слати лист про нове повідомлення в чаті
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'SHOP <noreply@shop.example>')

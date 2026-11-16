@@ -3,6 +3,7 @@ from django.urls import path
 from django.views.generic import TemplateView
 
 from . import account_views as acc
+from . import chat_views as chat
 from . import views
 
 urlpatterns = [
@@ -30,6 +31,13 @@ urlpatterns = [
     path("account/password-reset/sent/", acc.PasswordResetDone.as_view(), name="password_reset_done"),
     path("account/reset/done/", acc.PasswordResetComplete.as_view(), name="password_reset_complete"),
     path("account/reset/<uidb64>/<token>/", acc.PasswordResetConfirm.as_view(), name="password_reset_confirm"),
+
+    path("chat/messages/", chat.customer_messages, name="chat_messages"),
+    path("chat/send/", chat.customer_send, name="chat_send"),
+    path("seller/chat/", chat.seller_inbox, name="seller_chat"),
+    path("seller/chat/<int:pk>/", chat.seller_thread, name="seller_chat_thread"),
+    path("seller/chat/<int:pk>/messages/", chat.seller_messages, name="seller_chat_messages"),
+    path("seller/chat/<int:pk>/send/", chat.seller_send, name="seller_chat_send"),
 
     path("about/", TemplateView.as_view(template_name="pages/about.html"), name="about"),
     path("delivery/", TemplateView.as_view(template_name="pages/delivery.html"), name="delivery"),

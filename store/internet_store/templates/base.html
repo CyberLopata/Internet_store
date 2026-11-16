@@ -23,7 +23,9 @@
 
 {% include "partials/_footer.html" %}
 {% include "partials/_cart_drawer.html" %}
+{% block chat %}{% include "partials/_chat_widget.html" %}{% endblock %}
 <script src="{% static 'js/script.js' %}"></script>
+<script src="{% static 'js/chat.js' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

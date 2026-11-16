@@ -282,3 +282,48 @@ def get_profile(user):
     """Профіль користувача; для акаунтів, створених до появи профілів, створюється на льоту."""
     profile, _ = Profile.objects.get_or_create(user=user)
     return profile
+
+
+class ChatThread(models.Model):
+    """Розмова покупця з продавцем: одна на акаунт або на гостьову сесію."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="Покупець", null=True, blank=True,
+        on_delete=models.CASCADE, related_name="chat_threads",
+    )
+    created = models.DateTimeField("Створено", auto_now_add=True)
+    updated = models.DateTimeField("Остання активність", auto_now=True)
+
+    class Meta:
+        ordering = ["-updated"]
+        verbose_name = "Чат"
+        verbose_name_plural = "Чати"
+
+    def __str__(self):
+        return f"Чат #{self.pk}: {self.customer_name}"
+
+    @property
+    def customer_name(self):
+        if self.user_id:
+            return self.user.first_name or self.user.email or self.user.username
+        return f"Гість #{self.pk}"
+
+
+class ChatMessage(models.Model):
+    thread = models.ForeignKey(ChatThread, on_delete=models.CASCADE, related_name="messages")
+    seller = models.BooleanField("Від продавця", default=False)
+    text = models.TextField("Текст", max_length=1000)
+    product = models.ForeignKey(
+        Product, verbose_name="Товар", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    read = models.BooleanField("Прочитано", default=False)  # прочитано протилежною стороною
+    created = models.DateTimeField("Надіслано", auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Повідомлення чату"
+        verbose_name_plural = "Повідомлення чату"
+        indexes = [models.Index(fields=["thread", "seller", "read"])]
+
+    def __str__(self):
+        return f"{'Продавець' if self.seller else 'Покупець'}: {self.text[:40]}"
