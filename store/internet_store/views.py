@@ -10,13 +10,17 @@ from django.views.decorators.http import require_POST
 
 from .cart import Cart
 from .forms import CheckoutForm, ReviewForm
-from .models import Category, Order, OrderItem, Product, get_profile
+from .models import Category, Order, OrderItem, Product, ProductVariant, get_profile
 
 PAGE_SIZE = 12
 
 
+class OutOfStock(Exception):
+    pass
+
+
 def index(request):
-    hits = Product.objects.filter(is_active=True, is_hit=True).select_related("category")
+    hits = Product.objects.filter(is_active=True, is_hit=True).select_related("category").prefetch_related("variants")
     sub_ids = hits.values_list("category_id", flat=True)
     tabs = Category.objects.filter(pk__in=sub_ids)
     tab = request.GET.get("tab")
@@ -31,7 +35,7 @@ def index(request):
 
 
 def catalog(request, slug=None):
-    products = Product.objects.filter(is_active=True).select_related("category")
+    products = Product.objects.filter(is_active=True).select_related("category").prefetch_related("variants")
     category = None
     title = "Усі товари"
     if slug:
@@ -65,8 +69,8 @@ def catalog(request, slug=None):
 
 
 def product_detail(request, slug):
-    product = get_object_or_404(Product.objects.select_related("category"), slug=slug, is_active=True)
-    related = Product.objects.filter(category=product.category, is_active=True).exclude(pk=product.pk)[:4]
+    product = get_object_or_404(Product.objects.select_related("category").prefetch_related("variants"), slug=slug, is_active=True)
+    related = Product.objects.filter(category=product.category, is_active=True).exclude(pk=product.pk).prefetch_related("variants")[:4]
     initial = {"name": request.user.first_name} if request.user.is_authenticated else None
     form = ReviewForm(request.POST if request.method == "POST" else None, initial=initial)
     just_reviewed = False
@@ -82,8 +86,13 @@ def product_detail(request, slug):
     gallery.extend(photo.image.url for photo in product.photos.all() if photo.image)
     reviews = product.reviews.filter(is_published=True)
     review_stats = reviews.aggregate(total=Count("pk"), average=Avg("rating"))
+    variants_data = [{
+        "id": v.pk, "size": v.size, "color": v.color_name, "hex": v.color_hex, "stock": v.stock,
+        "price": float(v.effective_price),
+    } for v in product.active_variants]
     return render(request, "product_detail.html", {
         "product": product,
+        "variants_data": variants_data,
         "related": related,
         "gallery": gallery,
         "reviews": reviews,
@@ -126,6 +135,14 @@ def cart_drawer(request):
     return _drawer_response(request)
 
 
+def _cart_add_error(request, product, text):
+    """Помилка додавання: AJAX отримує 400 (і сторінка сама перейде на звичайну відправку форми)."""
+    if _is_ajax(request):
+        return JsonResponse({"error": text}, status=400)
+    messages.error(request, text)
+    return redirect(product.get_absolute_url())
+
+
 @require_POST
 def cart_add(request, pk):
     product = get_object_or_404(Product, pk=pk, is_active=True)
@@ -133,28 +150,41 @@ def cart_add(request, pk):
         qty = max(1, int(request.POST.get("quantity", 1)))
     except ValueError:
         qty = 1
-    Cart(request).add(product, qty)
+    variant = None
+    options = product.active_variants
+    if options:  # для товару з варіантами обов'язково обрати розмір/колір
+        wanted = request.POST.get("variant", "")
+        variant = next((v for v in options if str(v.pk) == wanted), None)
+        if variant is None:
+            return _cart_add_error(request, product, "Оберіть розмір і колір, перш ніж додати товар до кошика.")
+        if variant.stock <= 0:
+            return _cart_add_error(request, product, "Цього варіанту немає в наявності.")
+    in_cart = Cart(request).add(product, qty, variant)
     if _is_ajax(request):
         return _drawer_response(request)
-    messages.success(request, f"«{product.name}» додано до кошика")
+    name = f"{product.name} ({variant.label})" if variant else product.name
+    if variant and in_cart >= variant.stock:
+        messages.warning(request, f"«{name}» у кошику: {in_cart} шт. — це весь залишок.")
+    else:
+        messages.success(request, f"«{name}» додано до кошика")
     return _back(request)
 
 
 @require_POST
-def cart_update(request, pk):
+def cart_update(request, key):
     try:
         qty = int(request.POST.get("quantity", 1))
     except ValueError:
         qty = 1
-    Cart(request).set(pk, qty)
+    Cart(request).set(key, qty)
     if _is_ajax(request):
         return _drawer_response(request)
     return redirect("cart")
 
 
 @require_POST
-def cart_remove(request, pk):
-    Cart(request).remove(pk)
+def cart_remove(request, key):
+    Cart(request).remove(key)
     if _is_ajax(request):
         return _drawer_response(request)
     return redirect("cart")
@@ -190,17 +220,34 @@ def checkout(request):
     initial = _checkout_initial(request.user) if request.user.is_authenticated else None
     form = CheckoutForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
-        with transaction.atomic():
-            order = form.save(commit=False)
-            if request.user.is_authenticated:
-                order.user = request.user
-            order.total = sum(i["subtotal"] for i in items)
-            order.save()
-            OrderItem.objects.bulk_create([
-                OrderItem(order=order, product=i["product"], product_name=i["product"].name,
-                          price=i["product"].price, quantity=i["quantity"])
-                for i in items
-            ])
+        try:
+            with transaction.atomic():
+                # блокуємо рядки варіантів і ще раз перевіряємо залишок: так два покупці не купують останню пару
+                locked = {v.pk: v for v in ProductVariant.objects.select_for_update().filter(
+                    pk__in=[i["variant"].pk for i in items if i["variant"]])}
+                for i in items:
+                    if i["variant"]:
+                        fresh = locked.get(i["variant"].pk)
+                        if fresh is None or fresh.stock < i["quantity"]:
+                            raise OutOfStock(f"«{i['product'].name} ({i['label']})» уже немає в потрібній кількості.")
+                order = form.save(commit=False)
+                if request.user.is_authenticated:
+                    order.user = request.user
+                order.total = sum(i["subtotal"] for i in items)
+                order.save()
+                OrderItem.objects.bulk_create([
+                    OrderItem(order=order, product=i["product"], variant=i["variant"], variant_label=i["label"],
+                              product_name=i["product"].name, price=i["unit_price"], quantity=i["quantity"])
+                    for i in items
+                ])
+                for i in items:
+                    if i["variant"]:
+                        fresh = locked[i["variant"].pk]
+                        fresh.stock -= i["quantity"]
+                        fresh.save(update_fields=["stock"])
+        except OutOfStock as e:
+            messages.error(request, f"{e} Перегляньте кошик.")
+            return redirect("cart")
         if request.user.is_authenticated:
             _remember_delivery(request.user, order)
         cart.clear()

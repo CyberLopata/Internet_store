@@ -1,3 +1,4 @@
+import re
 import uuid
 from decimal import Decimal
 from io import BytesIO
@@ -98,6 +99,21 @@ class Product(models.Model):
 
     def get_absolute_url(self):
         return reverse("product_detail", args=[self.slug])
+
+    @property
+    def active_variants(self):
+        """Активні варіанти (розмір/колір). Використовує prefetch_related("variants"), якщо він є."""
+        return [v for v in self.variants.all() if v.is_active]
+
+    @property
+    def has_variants(self):
+        return bool(self.active_variants)
+
+    @property
+    def in_stock(self):
+        """Товар без варіантів вважається завжди доступним; з варіантами — якщо хоч один є в наявності."""
+        variants = self.active_variants
+        return not variants or any(v.stock > 0 for v in variants)
 
     def save(self, *args, **kwargs):
         old_name = None
@@ -237,10 +253,20 @@ class Order(models.Model):
     def __str__(self):
         return f"Замовлення №{self.pk} — {self.name}"
 
+    def save(self, *args, **kwargs):
+        prev = Order.objects.filter(pk=self.pk).values_list("status", flat=True).first() if self.pk else None
+        super().save(*args, **kwargs)
+        if prev and prev != self.Status.CANCELED and self.status == self.Status.CANCELED:
+            # скасування замовлення повертає товар на склад
+            for item in self.items.exclude(variant__isnull=True):
+                ProductVariant.objects.filter(pk=item.variant_id).update(stock=models.F("stock") + item.quantity)
+
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
+    variant = models.ForeignKey("ProductVariant", on_delete=models.SET_NULL, null=True, blank=True)
+    variant_label = models.CharField(max_length=110, blank=True)
     product_name = models.CharField(max_length=200)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
@@ -252,6 +278,10 @@ class OrderItem(models.Model):
     @property
     def subtotal(self):
         return self.price * self.quantity
+
+    @property
+    def full_name(self):
+        return f"{self.product_name} ({self.variant_label})" if self.variant_label else self.product_name
 
 
 class Profile(models.Model):
@@ -282,6 +312,57 @@ def get_profile(user):
     """Профіль користувача; для акаунтів, створених до появи профілів, створюється на льоту."""
     profile, _ = Profile.objects.get_or_create(user=user)
     return profile
+
+
+class ProductVariant(models.Model):
+    """Варіант товару: розмір і/або колір з власним залишком (і, за потреби, власною ціною)."""
+
+    product = models.ForeignKey(Product, verbose_name="Товар", on_delete=models.CASCADE, related_name="variants")
+    size = models.CharField("Розмір", max_length=40, blank=True, help_text="Напр. 42, M, 160×200. Можна залишити порожнім.")
+    color_name = models.CharField("Колір", max_length=60, blank=True, help_text="Напр. Чорний. Можна залишити порожнім.")
+    color_hex = models.CharField(
+        "Колір кружечка", max_length=7, blank=True,
+        help_text="Можна не заповнювати: для звичайних кольорів (чорний, білий, синій…) він підставиться сам за назвою. "
+                  "Для рідкісного кольору виберіть його мишкою у віконці поруч.",
+    )
+    stock = models.PositiveIntegerField("Залишок, шт.", default=0)
+    price = models.DecimalField(
+        "Ціна варіанту", max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Залиште порожнім, щоб діяла ціна товару.",
+    )
+    is_active = models.BooleanField("Активний", default=True)
+    order = models.PositiveIntegerField("Порядок", default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "Варіант товару"
+        verbose_name_plural = "Варіанти товару (розмір / колір)"
+        constraints = [
+            models.UniqueConstraint(fields=["product", "size", "color_name"], name="uniq_variant_per_product"),
+        ]
+
+    def __str__(self):
+        return self.label or "Без назви"
+
+    @property
+    def label(self):
+        return " / ".join(x for x in (self.size, self.color_name) if x)
+
+    @property
+    def effective_price(self):
+        return self.price if self.price is not None else self.product.price
+
+    def save(self, *args, **kwargs):
+        if not self.color_hex and self.color_name:
+            from .colors import hex_for_name
+            self.color_hex = hex_for_name(self.color_name)
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        if not self.size.strip() and not self.color_name.strip():
+            raise ValidationError("Вкажіть розмір або колір.")
+        if self.color_hex and not re.fullmatch(r"#[0-9a-fA-F]{6}", self.color_hex):
+            raise ValidationError({"color_hex": "Код кольору у форматі #RRGGBB."})
 
 
 class ChatThread(models.Model):

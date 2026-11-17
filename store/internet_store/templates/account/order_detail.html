@@ -9,7 +9,7 @@
     <p class="muted">Оформлено {{ order.created|date:"d.m.Y H:i" }}</p>
     <div class="summary">
       {% for i in order.items.all %}
-      <div class="srow"><span>{% if i.product %}<a href="{{ i.product.get_absolute_url }}">{{ i.product_name }}</a>{% else %}{{ i.product_name }}{% endif %} × {{ i.quantity }}</span><span>{{ i.subtotal|floatformat:"0g" }} ₴</span></div>
+      <div class="srow"><span>{% if i.product %}<a href="{{ i.product.get_absolute_url }}">{{ i.full_name }}</a>{% else %}{{ i.full_name }}{% endif %} × {{ i.quantity }}</span><span>{{ i.subtotal|floatformat:"0g" }} ₴</span></div>
       {% endfor %}
       <div class="total"><span>Разом</span><span>{{ order.total|floatformat:"0g" }} ₴</span></div>
     </div>

@@ -2,7 +2,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Order, Product, ProductImage, Review
+from .models import Order, Product, ProductImage, ProductVariant, Review
 
 
 class ShopFlowTests(TestCase):
@@ -385,3 +385,158 @@ class ChatTests(TestCase):
         s = self.client_class()
         s.force_login(self.staff)
         self.assertNotContains(s.get(reverse("seller_chat")), "<script>alert(1)")
+
+
+class VariantTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_shop", verbosity=0)
+        cls.p = Product.objects.get(slug="podushka-comfort")
+        cls.v40 = ProductVariant.objects.create(product=cls.p, size="40", color_name="Чорний", color_hex="#111111", stock=3)
+        cls.v41 = ProductVariant.objects.create(product=cls.p, size="41", color_name="Чорний", color_hex="#111111", stock=0)
+        cls.v42 = ProductVariant.objects.create(product=cls.p, size="42", color_name="Білий", color_hex="#ffffff", stock=5,
+                                                price=999)
+        cls.ajax = {"X-Requested-With": "XMLHttpRequest"}
+
+    def add(self, variant=None, qty=1, **kw):
+        data = {"quantity": qty}
+        if variant is not None:
+            data["variant"] = variant.pk
+        return self.client.post(reverse("cart_add", args=[self.p.pk]), data, **kw)
+
+    def test_must_choose_variant(self):
+        r = self.add()
+        self.assertRedirects(r, self.p.get_absolute_url(), fetch_redirect_response=False)
+        self.assertEqual(self.add(headers=self.ajax).status_code, 400)
+        self.assertEqual(self.client.get(reverse("cart")).context["items"], [])
+
+    def test_out_of_stock_variant_rejected(self):
+        self.assertEqual(self.add(self.v41, headers=self.ajax).status_code, 400)
+
+    def test_variant_of_other_product_rejected(self):
+        other = Product.objects.exclude(pk=self.p.pk).first()
+        v = ProductVariant.objects.create(product=other, size="M", stock=9)
+        self.assertEqual(self.add(v, headers=self.ajax).status_code, 400)
+
+    def test_add_distinct_variants_and_prices(self):
+        self.add(self.v40, 2)
+        self.add(self.v42, 1)
+        items = self.client.get(reverse("cart")).context["items"]
+        self.assertEqual({i["label"] for i in items}, {"40 / Чорний", "42 / Білий"})
+        self.assertEqual(sum(i["subtotal"] for i in items), 2 * self.p.price + 999)
+
+    def test_quantity_capped_by_stock(self):
+        self.add(self.v40, 10)
+        self.add(self.v40, 10)
+        item = self.client.get(reverse("cart")).context["items"][0]
+        self.assertEqual(item["quantity"], 3)
+        key = item["key"]
+        self.client.post(reverse("cart_update", args=[key]), {"quantity": 50})
+        self.assertEqual(self.client.get(reverse("cart")).context["items"][0]["quantity"], 3)
+
+    def test_checkout_decrements_stock_and_saves_label(self):
+        self.add(self.v40, 2)
+        r = self.client.post(reverse("checkout"), {"name": "І", "phone": "1", "city": "К", "address": "А"})
+        order = Order.objects.get()
+        self.assertRedirects(r, reverse("order_success", args=[order.pk]))
+        item = order.items.get()
+        self.assertEqual((item.variant_label, item.variant_id), ("40 / Чорний", self.v40.pk))
+        self.assertEqual(item.full_name, f"{self.p.name} (40 / Чорний)")
+        self.v40.refresh_from_db()
+        self.assertEqual(self.v40.stock, 1)
+
+    def test_checkout_blocked_if_stock_vanished(self):
+        self.add(self.v40, 3)
+        ProductVariant.objects.filter(pk=self.v40.pk).update(stock=1)  # хтось інший купив
+        r = self.client.post(reverse("checkout"), {"name": "І", "phone": "1", "city": "К", "address": "А"})
+        # items() у кошику сам обрізає до залишку, тому замовлення на 1 шт. проходить, а не на 3
+        order = Order.objects.get()
+        self.assertEqual(order.items.get().quantity, 1)
+        self.v40.refresh_from_db()
+        self.assertEqual(self.v40.stock, 0)
+
+    def test_checkout_race_out_of_stock_error(self):
+        from unittest import mock
+        self.add(self.v40, 2)
+        real = ProductVariant.objects.select_for_update
+
+        def stale(*a, **k):  # імітуємо: між показом кошика і блокуванням залишок зник
+            ProductVariant.objects.filter(pk=self.v40.pk).update(stock=0)
+            return real(*a, **k)
+        with mock.patch.object(type(ProductVariant.objects), "select_for_update", side_effect=stale):
+            r = self.client.post(reverse("checkout"), {"name": "І", "phone": "1", "city": "К", "address": "А"})
+        self.assertRedirects(r, reverse("cart"), fetch_redirect_response=False)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_cancel_returns_stock(self):
+        self.add(self.v40, 2)
+        self.client.post(reverse("checkout"), {"name": "І", "phone": "1", "city": "К", "address": "А"})
+        order = Order.objects.get()
+        self.v40.refresh_from_db()
+        self.assertEqual(self.v40.stock, 1)
+        order.status = Order.Status.CANCELED
+        order.save()
+        order.save()  # повторне збереження не повертає удруге
+        self.v40.refresh_from_db()
+        self.assertEqual(self.v40.stock, 3)
+
+    def test_legacy_cart_key_for_product_with_variants_dropped(self):
+        s = self.client.session
+        s["cart"] = {str(self.p.pk): 2}
+        s.save()
+        self.assertEqual(self.client.get(reverse("cart")).context["items"], [])
+
+    def test_pdp_and_card_render(self):
+        page = self.client.get(self.p.get_absolute_url())
+        self.assertContains(page, 'id="variants-data"')
+        self.assertContains(page, "variants.js")
+        card = self.client.get(reverse("catalog"))
+        self.assertContains(card, "Обрати розмір / колір")
+
+    def test_product_all_sold_out(self):
+        ProductVariant.objects.filter(product=self.p).update(stock=0)
+        self.assertContains(self.client.get(reverse("catalog")), "Немає в наявності")
+
+    def test_no_variants_product_unchanged(self):
+        other = Product.objects.exclude(pk=self.p.pk).first()
+        self.client.post(reverse("cart_add", args=[other.pk]), {"quantity": 2})
+        self.assertEqual(self.client.get(reverse("cart")).context["items"][0]["quantity"], 2)
+
+    def test_variant_validation(self):
+        from django.core.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
+            ProductVariant(product=self.p).clean()
+        with self.assertRaises(ValidationError):
+            ProductVariant(product=self.p, size="M", color_hex="red").clean()
+
+
+class VariantColorTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_shop", verbosity=0)
+        cls.p = Product.objects.first()
+
+    def make(self, name, hex=""):
+        return ProductVariant.objects.create(product=self.p, size=name[:3], color_name=name, color_hex=hex, stock=1)
+
+    def test_hex_filled_from_name(self):
+        self.assertEqual(self.make("Чорний").color_hex, "#1d1d1f")
+        self.assertEqual(self.make("  БІЛИЙ ").color_hex, "#f5f5f5")
+
+    def test_longer_name_wins_and_substring(self):
+        from .colors import hex_for_name
+        self.assertEqual(hex_for_name("Темно-синій"), "#1a2a5e")
+        self.assertEqual(hex_for_name("Синій"), "#2f4fd8")
+        self.assertEqual(hex_for_name("Чорний матовий"), "#1d1d1f")
+
+    def test_explicit_hex_wins_and_unknown_stays_empty(self):
+        self.assertEqual(self.make("Чорний", "#123456").color_hex, "#123456")
+        self.assertEqual(self.make("Райдужний").color_hex, "")
+
+    def test_admin_product_page_has_variants_and_picker_js(self):
+        from django.contrib.auth import get_user_model
+        admin = get_user_model().objects.create_superuser("adm", "a@e.com", "Adm-pass-12345")
+        self.client.force_login(admin)
+        page = self.client.get(reverse("admin:internet_store_product_change", args=[self.p.pk]))
+        self.assertContains(page, "Варіанти товару")
+        self.assertContains(page, "admin_variant_color.js")

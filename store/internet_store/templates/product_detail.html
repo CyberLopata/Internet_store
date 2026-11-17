@@ -35,12 +35,25 @@
 
     <form class="buy" method="post" action="{% url 'cart_add' product.pk %}">{% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      {% if variants_data %}
+      <input type="hidden" name="variant" value="" data-variant-input>
+      <div class="variants" data-variants>
+        <div class="vgroup" data-vgroup="color" hidden>
+          <div class="vlabel">Колір: <b data-vval></b></div><div class="vopts" role="radiogroup" aria-label="Колір"></div>
+        </div>
+        <div class="vgroup" data-vgroup="size" hidden>
+          <div class="vlabel">Розмір: <b data-vval></b></div><div class="vopts" role="radiogroup" aria-label="Розмір"></div>
+        </div>
+        <p class="vstatus" data-vstatus aria-live="polite"></p>
+      </div>
+      <noscript><label class="vnojs">Варіант: <select name="variant">{% for v in product.active_variants %}<option value="{{ v.pk }}"{% if v.stock <= 0 %} disabled{% endif %}>{{ v.label }}{% if v.stock <= 0 %} — немає{% endif %}</option>{% endfor %}</select></label></noscript>
+      {% endif %}
       <div class="stepper">
         <button type="button" data-step="-1" aria-label="Менше">−</button>
         <input type="number" name="quantity" value="1" min="1" max="99" aria-label="Кількість">
         <button type="button" data-step="1" aria-label="Більше">+</button>
       </div>
-      <button class="add" type="submit">Додати до кошика</button>
+      <button class="add" type="submit" data-add-btn>Додати до кошика</button>
     </form>
 
     <p class="ask"><button type="button" class="cta-outline" data-chat-open data-product-id="{{ product.pk }}" data-product-name="{{ product.name }}">💬 Запитати продавця (наприклад, про розмір чи наявність)</button></p>
@@ -102,3 +115,4 @@
 <div class="grid">{% for p in related %}{% include "partials/_product_card.html" %}{% endfor %}</div>
 {% endif %}
 {% endblock %}
+{% block extra_js %}{% load static %}{% if variants_data %}{{ variants_data|json_script:"variants-data" }}<script src="{% static 'js/variants.js' %}"></script>{% endif %}{% endblock %}

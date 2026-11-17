@@ -5,7 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.db.models import Max
 from django.utils.html import format_html
 
-from .models import Category, ChatMessage, ChatThread, Order, OrderItem, Product, ProductImage, Profile, Review, validate_image_size
+from .models import Category, ChatMessage, ChatThread, Order, OrderItem, Product, ProductImage, ProductVariant, Profile, Review, validate_image_size
 
 User = get_user_model()
 
@@ -41,6 +41,15 @@ class ProductAdminForm(forms.ModelForm):
         fields = "__all__"
 
 
+class ProductVariantInline(admin.TabularInline):
+    model = ProductVariant
+    extra = 0
+    fields = ("size", "color_name", "color_hex", "stock", "price", "is_active", "order")
+
+    class Media:
+        js = ("js/admin_variant_color.js",)  # віконце вибору кольору поруч із текстовим полем
+
+
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 0
@@ -64,7 +73,7 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     form = ProductAdminForm
-    inlines = [ProductImageInline]
+    inlines = [ProductVariantInline, ProductImageInline]
     list_display =("preview", "name", "category", "price", "old_price", "is_hit", "is_active")
     list_display_links = ("preview", "name")
     readonly_fields = ("preview",)
@@ -93,7 +102,8 @@ class ProductAdmin(admin.ModelAdmin):
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    readonly_fields = ("product", "product_name", "price", "quantity")
+    readonly_fields = ("product", "product_name", "variant_label", "price", "quantity")
+    fields = ("product", "product_name", "variant_label", "price", "quantity")
     can_delete = False
 
 

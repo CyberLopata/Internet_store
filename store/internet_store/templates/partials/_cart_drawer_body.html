@@ -5,14 +5,15 @@
     <a class="dthumb{% if i.product.image %} has-img{% endif %}" href="{{ i.product.get_absolute_url }}"{% if not i.product.image %} style="background:{{ i.product.color }}"{% endif %}>{% if i.product.image %}<img src="{{ i.product.image.url }}" alt="{{ i.product.name }}">{% else %}{{ i.product.emoji }}{% endif %}</a>
     <div class="n">
       <a class="dname" href="{{ i.product.get_absolute_url }}">{{ i.product.name }}</a>
+      {% if i.label %}<span class="vtag">{{ i.label }}</span>{% endif %}
       <b>{{ i.subtotal|floatformat:"0g" }} ₴</b>
     </div>
-    <form method="post" action="{% url 'cart_update' i.product.pk %}" class="dqty" data-cart-form>{% csrf_token %}
+    <form method="post" action="{% url 'cart_update' i.key %}" class="dqty" data-cart-form>{% csrf_token %}
       <button type="submit" name="quantity" value="{{ i.quantity|add:'-1' }}" aria-label="Менше">−</button>
       <span>{{ i.quantity }}</span>
-      <button type="submit" name="quantity" value="{{ i.quantity|add:'1' }}" aria-label="Більше">+</button>
+      <button type="submit" name="quantity" value="{{ i.quantity|add:'1' }}" aria-label="Більше"{% if i.quantity >= i.max %} disabled{% endif %}>+</button>
     </form>
-    <form method="post" action="{% url 'cart_remove' i.product.pk %}" data-cart-form>{% csrf_token %}
+    <form method="post" action="{% url 'cart_remove' i.key %}" data-cart-form>{% csrf_token %}
       <button type="submit" aria-label="Видалити «{{ i.product.name }}»">✕</button>
     </form>
   </div>

@@ -21,7 +21,7 @@
   </form>
   <aside class="summary">
     <h3>Ваше замовлення</h3>
-    {% for i in items %}<div class="srow"><span>{{ i.product.name }} × {{ i.quantity }}</span><span>{{ i.subtotal|floatformat:"0g" }} ₴</span></div>{% endfor %}
+    {% for i in items %}<div class="srow"><span>{{ i.product.name }}{% if i.label %} ({{ i.label }}){% endif %} × {{ i.quantity }}</span><span>{{ i.subtotal|floatformat:"0g" }} ₴</span></div>{% endfor %}
     <div class="total"><span>Разом</span><span>{{ total|floatformat:"0g" }} ₴</span></div>
     <a class="back" href="{% url 'cart' %}">← Редагувати кошик</a>
   </aside>

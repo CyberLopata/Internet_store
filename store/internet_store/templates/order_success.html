@@ -6,7 +6,7 @@
   <h1>Дякуємо! Замовлення №{{ order.pk }} прийнято</h1>
   <p class="muted">Ми зв'яжемось з вами за номером {{ order.phone }} для підтвердження.</p>
   <div class="summary" style="max-width:420px;margin:20px auto">
-    {% for i in order.items.all %}<div class="srow"><span>{{ i.product_name }} × {{ i.quantity }}</span><span>{{ i.subtotal|floatformat:"0g" }} ₴</span></div>{% endfor %}
+    {% for i in order.items.all %}<div class="srow"><span>{{ i.full_name }} × {{ i.quantity }}</span><span>{{ i.subtotal|floatformat:"0g" }} ₴</span></div>{% endfor %}
     <div class="total"><span>Разом</span><span>{{ order.total|floatformat:"0g" }} ₴</span></div>
   </div>
   {% if user.is_authenticated and order.user_id == user.pk %}<a class="cta-outline" href="{% url 'account_order' order.pk %}">Переглянути в кабінеті</a> {% endif %}
