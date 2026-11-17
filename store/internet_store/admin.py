@@ -5,6 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.db.models import Max
 from django.utils.html import format_html
 
+from .variants import MAX_COMBINATIONS, combinations, create_variants, parse_list
 from .models import Category, ChatMessage, ChatThread, Order, OrderItem, Product, ProductImage, ProductVariant, Profile, Review, validate_image_size
 
 User = get_user_model()
@@ -36,9 +37,35 @@ class ProductAdminForm(forms.ModelForm):
                   "Головне фото вище показується в каталозі, додаткові — в галереї на сторінці товару.",
     )
 
+    bulk_sizes = forms.CharField(
+        label="Швидко додати: розміри", required=False,
+        widget=forms.TextInput(attrs={"placeholder": "39, 40, 41, 42"}),
+        help_text="Через кому. Разом із кольорами нижче створить усі комбінації розмір × колір одним разом.",
+    )
+    bulk_colors = forms.CharField(
+        label="Швидко додати: кольори", required=False,
+        widget=forms.TextInput(attrs={"placeholder": "Чорний, Білий, Темно-синій"}),
+        help_text="Через кому. Колір кружечка підбереться за назвою. Можна заповнити лише розміри або лише кольори.",
+    )
+    bulk_stock = forms.IntegerField(
+        label="Швидко додати: залишок кожного, шт.", required=False, min_value=0, max_value=100000, initial=10,
+        help_text="Скільки штук кожного варіанту. Потім змінити окремі рядки можна в таблиці нижче. "
+                  "Вже існуючі комбінації не змінюються.",
+    )
+
     class Meta:
         model = Product
         fields = "__all__"
+
+    def clean(self):
+        data = super().clean()
+        sizes, colors = parse_list(data.get("bulk_sizes")), parse_list(data.get("bulk_colors"))
+        if any(len(s) > 40 for s in sizes) or any(len(c) > 60 for c in colors):
+            raise forms.ValidationError("Розмір — до 40 символів, колір — до 60.")
+        if len(combinations(sizes, colors)) > MAX_COMBINATIONS:
+            raise forms.ValidationError(f"Забагато варіантів за раз (максимум {MAX_COMBINATIONS}).")
+        data["bulk_sizes_list"], data["bulk_colors_list"] = sizes, colors
+        return data
 
 
 class ProductVariantInline(admin.TabularInline):
@@ -97,6 +124,12 @@ class ProductAdmin(admin.ModelAdmin):
         for photo in form.cleaned_data.get("extra_photos", []):
             ProductImage.objects.create(product=product, image=photo, order=position)
             position += 1
+        sizes, colors = form.cleaned_data.get("bulk_sizes_list"), form.cleaned_data.get("bulk_colors_list")
+        if sizes or colors:
+            stock = form.cleaned_data.get("bulk_stock") or 0
+            created, skipped = create_variants(product, sizes, colors, stock)
+            note = f" Уже існували й пропущені: {skipped}." if skipped else ""
+            self.message_user(request, f"Швидко додано варіантів: {created}, залишок кожного — {stock} шт.{note}")
 
 
 class OrderItemInline(admin.TabularInline):

@@ -540,3 +540,53 @@ class VariantColorTests(TestCase):
         page = self.client.get(reverse("admin:internet_store_product_change", args=[self.p.pk]))
         self.assertContains(page, "Варіанти товару")
         self.assertContains(page, "admin_variant_color.js")
+
+
+class BulkVariantTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_shop", verbosity=0)
+        cls.p = Product.objects.first()
+
+    def test_parse_list(self):
+        from .variants import parse_list
+        self.assertEqual(parse_list(" 39, 40;41,\n 40 ,, "), ["39", "40", "41"])
+        self.assertEqual(parse_list("Чорний, чорний, Білий"), ["Чорний", "Білий"])
+        self.assertEqual(parse_list(""), [])
+
+    def test_matrix_created_with_colors_and_skips_existing(self):
+        from .variants import create_variants, parse_list
+        ProductVariant.objects.create(product=self.p, size="40", color_name="Чорний", stock=7)
+        made, skipped = create_variants(self.p, parse_list("39,40,41"), parse_list("Чорний,Білий"), 10)
+        self.assertEqual((made, skipped), (5, 1))
+        self.assertEqual(self.p.variants.count(), 6)
+        self.assertEqual(self.p.variants.get(size="40", color_name="Чорний").stock, 7)  # існуючий не змінено
+        self.assertEqual(self.p.variants.get(size="39", color_name="Білий").color_hex, "#f5f5f5")
+
+    def test_only_sizes_or_only_colors(self):
+        from .variants import create_variants
+        self.assertEqual(create_variants(self.p, ["S", "M"], [], 3), (2, 0))
+        self.assertEqual(create_variants(self.p, [], ["Червоний"], 3), (1, 0))
+
+    def test_admin_save_creates_variants(self):
+        from django.contrib.auth import get_user_model
+        admin = get_user_model().objects.create_superuser("adm2", "a2@e.com", "Adm-pass-12345")
+        self.client.force_login(admin)
+        url = reverse("admin:internet_store_product_change", args=[self.p.pk])
+        page = self.client.get(url)
+        self.assertContains(page, "Швидко додати: розміри")
+        form = page.context["adminform"].form
+        data = {k: (v if v is not None else "") for k, v in form.initial.items() if k not in ("image",)}
+        for fs in page.context["inline_admin_formsets"]:
+            mf = fs.formset.management_form
+            data.update({mf.add_prefix("TOTAL_FORMS"): 0, mf.add_prefix("INITIAL_FORMS"): 0,
+                         mf.add_prefix("MIN_NUM_FORMS"): 0, mf.add_prefix("MAX_NUM_FORMS"): 1000})
+        data.update({"category": self.p.category_id, "name": self.p.name, "slug": self.p.slug, "price": self.p.price,
+                     "is_active": "on", "bulk_sizes": "40, 41", "bulk_colors": "Чорний, Білий", "bulk_stock": "4"})
+        for k in ("old_price", "color", "emoji", "description", "reviews_count"):
+            data.setdefault(k, form.initial.get(k) or "")
+        data["reviews_count"] = self.p.reviews_count
+        r = self.client.post(url, data)
+        self.assertEqual(r.status_code, 302, getattr(r, "context", None) and r.context["adminform"].form.errors)
+        self.assertEqual(self.p.variants.count(), 4)
+        self.assertEqual(set(self.p.variants.values_list("stock", flat=True)), {4})
