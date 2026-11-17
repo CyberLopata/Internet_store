@@ -1,8 +1,10 @@
+from django.contrib import admin as django_admin
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Order, Product, ProductImage, ProductVariant, Review
+from .admin import OrderItemInline
+from .models import Order, OrderItem, Product, ProductImage, ProductVariant, Review
 
 
 class ShopFlowTests(TestCase):
@@ -125,6 +127,26 @@ class ProductImageTests(TestCase):
         finally:
             p.delete()
         self.assertFalse(path.exists())
+
+
+class OrderAdminTests(TestCase):
+    def test_order_item_inline_shows_product_image_or_placeholder(self):
+        from types import SimpleNamespace
+
+        inline = OrderItemInline(OrderItem, django_admin.site)
+        self.assertIn("product_image", inline.fields)
+        item = SimpleNamespace(product=SimpleNamespace(
+            image=SimpleNamespace(url="/static/images/order-item.webp"),
+        ))
+
+        preview = str(inline.product_image(item))
+
+        self.assertIn('<img src="/static/images/order-item.webp"', preview)
+        self.assertEqual(inline.product_image(SimpleNamespace(product=None)), "—")
+        self.assertEqual(
+            inline.product_image(SimpleNamespace(product=SimpleNamespace(image=None))),
+            "—",
+        )
 
 
 class ReviewTests(TestCase):

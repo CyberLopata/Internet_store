@@ -135,9 +135,18 @@ class ProductAdmin(admin.ModelAdmin):
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    readonly_fields = ("product", "product_name", "variant_label", "price", "quantity")
-    fields = ("product", "product_name", "variant_label", "price", "quantity")
+    readonly_fields = ("product_image", "product", "product_name", "variant_label", "price", "quantity")
+    fields = ("product_image", "product", "product_name", "variant_label", "price", "quantity")
     can_delete = False
+
+    @admin.display(description="Фото")
+    def product_image(self, obj):
+        if obj.product and obj.product.image:
+            return format_html(
+                '<img src="{}" style="height:80px;width:80px;object-fit:cover;border-radius:6px">',
+                obj.product.image.url,
+            )
+        return "—"
 
 
 @admin.register(Order)
