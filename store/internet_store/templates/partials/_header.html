@@ -7,6 +7,7 @@
   </form>
   <div class="icons">
     <button type="button" class="ibtn" data-theme-toggle aria-label="Змінити тему" title="Змінити тему" hidden>🌙</button>
+    <a class="ibtn" href="{% url 'favorites' %}" title="Обране" aria-label="Обране">♡ <span class="t">Обране</span><span class="badge" data-fav-count{% if not fav_count %} hidden{% endif %}>{{ fav_count }}</span></a>
     {% if user.is_staff %}<a class="ibtn" href="{% url 'seller_chat' %}" title="Чати з покупцями">💬 <span class="t">Чати</span><span class="badge"{% if not chat_unread %} hidden{% endif %}>{{ chat_unread }}</span></a>{% endif %}
     {% if user.is_authenticated %}
     <a class="ibtn" href="{% url 'account' %}" title="Особистий кабінет">👤 <span class="t">{{ user.first_name|default:user.username|truncatechars:12 }}</span></a>

@@ -6,7 +6,7 @@ from django.db.models import Max
 from django.utils.html import format_html
 
 from .variants import MAX_COMBINATIONS, combinations, create_variants, parse_list
-from .models import Category, ChatMessage, ChatThread, Order, OrderItem, Product, ProductImage, ProductVariant, Profile, Review, validate_image_size
+from .models import Category, ChatMessage, Favorite, ChatThread, Order, OrderItem, Product, ProductImage, ProductVariant, Profile, Review, validate_image_size
 
 User = get_user_model()
 
@@ -212,3 +212,10 @@ class ChatThreadAdmin(admin.ModelAdmin):
     list_display = ("id", "customer_name", "updated")
     raw_id_fields = ("user",)
     inlines = [ChatMessageInline]
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ("user", "product", "created")
+    raw_id_fields = ("user", "product")
+    search_fields = ("user__email", "product__name")

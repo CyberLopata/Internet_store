@@ -1,3 +1,4 @@
+from . import favorites
 from .cart import Cart
 from .models import Category, ChatMessage
 
@@ -8,7 +9,10 @@ def shop(request):
     chat_unread = 0
     if user.is_authenticated and user.is_staff:
         chat_unread = ChatMessage.objects.filter(seller=False, read=False).count()
+    fav_ids = favorites.favorite_ids(request)
     return {
+        "fav_ids": set(fav_ids),
+        "fav_count": len(fav_ids),
         "chat_unread": chat_unread,
         "menu_categories": Category.objects.filter(parent__isnull=True, in_menu=True),
         "cart_count": len(cart),

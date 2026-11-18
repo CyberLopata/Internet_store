@@ -646,3 +646,94 @@ class ColorPhotoTests(TestCase):
         self.assertContains(page, "Для всіх (нейтральне)")
         self.assertContains(page, '<option value="Червоний"')
         self.assertContains(page, "такого кольору вже немає")  # «Рожевий» позначено як застарілий
+
+
+class FavoriteTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_shop", verbosity=0)
+        cls.p1, cls.p2 = Product.objects.all()[:2]
+
+    def toggle(self, client, product, **kw):
+        return client.post(reverse("favorite_toggle", args=[product.pk]), **kw)
+
+    def test_guest_toggle_ajax_and_page(self):
+        r = self.toggle(self.client, self.p1, headers={"X-Requested-With": "XMLHttpRequest"})
+        self.assertEqual(r.json(), {"active": True, "count": 1})
+        page = self.client.get(reverse("favorites"))
+        self.assertContains(page, self.p1.name)
+        r = self.toggle(self.client, self.p1, headers={"X-Requested-With": "XMLHttpRequest"})
+        self.assertEqual(r.json(), {"active": False, "count": 0})
+        self.assertContains(self.client.get(reverse("favorites")), "Тут поки порожньо")
+
+    def test_non_ajax_redirects_back(self):
+        r = self.client.post(reverse("favorite_toggle", args=[self.p1.pk]), {"next": "/catalog/"})
+        self.assertRedirects(r, "/catalog/", fetch_redirect_response=False)
+        r = self.client.post(reverse("favorite_toggle", args=[self.p1.pk]), {"next": "https://evil.com/"})
+        self.assertRedirects(r, reverse("favorites"), fetch_redirect_response=False)
+
+    def test_get_not_allowed_and_inactive_404(self):
+        self.assertEqual(self.client.get(reverse("favorite_toggle", args=[self.p1.pk])).status_code, 405)
+        Product.objects.filter(pk=self.p1.pk).update(is_active=False)
+        self.assertEqual(self.toggle(self.client, self.p1).status_code, 404)
+
+    def test_inactive_product_hidden_from_page_and_count(self):
+        self.toggle(self.client, self.p1)
+        self.toggle(self.client, self.p2)
+        Product.objects.filter(pk=self.p1.pk).update(is_active=False)
+        ctx = self.client.get(reverse("favorites")).context
+        self.assertEqual([p.pk for p in ctx["products"]], [self.p2.pk])
+        self.assertEqual(ctx["fav_count"], 1)
+
+    def test_newest_first(self):
+        self.toggle(self.client, self.p1)
+        self.toggle(self.client, self.p2)
+        self.assertEqual([p.pk for p in self.client.get(reverse("favorites")).context["products"]],
+                         [self.p2.pk, self.p1.pk])
+
+    def test_hearts_rendered_on_cards_and_pdp(self):
+        self.toggle(self.client, self.p1)
+        html = self.client.get(reverse("catalog")).content.decode()
+        self.assertIn(f'data-fav="{self.p1.pk}"', html)
+        self.assertIn('class="fav-btn on"', html)
+        pdp = self.client.get(self.p1.get_absolute_url()).content.decode()
+        self.assertIn("В обраному", pdp)
+        self.assertIn('data-fav-count>1<', self.client.get(reverse("index")).content.decode().replace(" ", ""))
+
+    def test_user_favorites_persist_in_db(self):
+        from django.contrib.auth import get_user_model
+
+        from .models import Favorite
+        u = get_user_model().objects.create_user("f@example.com", "f@example.com", "Fav-pass-12345")
+        self.client.force_login(u)
+        self.toggle(self.client, self.p1)
+        self.assertTrue(Favorite.objects.filter(user=u, product=self.p1).exists())
+        other = self.client_class()
+        self.assertNotContains(other.get(reverse("favorites")), self.p1.name)  # інші не бачать
+        self.toggle(self.client, self.p1)
+        self.assertFalse(Favorite.objects.filter(user=u).exists())
+
+    def test_guest_favorites_merge_on_login_and_register(self):
+        from django.contrib.auth import get_user_model
+
+        from .models import Favorite
+        self.toggle(self.client, self.p1)
+        self.toggle(self.client, self.p2)
+        u = get_user_model().objects.create_user("m@example.com", "m@example.com", "Merge-pass-12345")
+        Favorite.objects.create(user=u, product=self.p1)  # вже було в акаунті: дубля не буде
+        r = self.client.post(reverse("login"), {"username": "m@example.com", "password": "Merge-pass-12345"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(Favorite.objects.filter(user=u).count(), 2)
+        self.assertNotIn("favorites", self.client.session)
+        # реєстрація теж зливає
+        c = self.client_class()
+        self.toggle(c, self.p2)
+        c.post(reverse("register"), {"first_name": "Н", "email": "new@example.com",
+                                     "password1": "Str0ng-pass-91", "password2": "Str0ng-pass-91"})
+        self.assertEqual(Favorite.objects.filter(user__email="new@example.com", product=self.p2).count(), 1)
+
+    def test_account_nav_link_and_empty_state_link(self):
+        from django.contrib.auth import get_user_model
+        u = get_user_model().objects.create_user("n@example.com", "n@example.com", "Nav-pass-12345")
+        self.client.force_login(u)
+        self.assertContains(self.client.get(reverse("account")), reverse("favorites"))

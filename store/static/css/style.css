@@ -331,3 +331,26 @@ a.rate:hover{color:var(--primary)}
 
 /* ---- Фото за кольором ---- */
 .gnav[hidden],.gthumbs[hidden],.pimg img[hidden]{display:none}
+
+/* ---- Обране ---- */
+.card{position:relative}
+.fav{position:absolute;top:8px;right:8px;margin:0;z-index:2}
+.fav-btn{width:36px;height:36px;border-radius:50%;border:0;background:var(--bg);color:#6b7285;display:grid;place-items:center;cursor:pointer;padding:0;box-shadow:0 1px 5px rgba(0,0,0,.25);transition:transform .15s}
+.fav-btn:hover{transform:scale(1.08)}
+.fav-btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+.fav-btn.on{color:var(--accent)}
+.fav-btn.on svg{fill:currentColor}
+.fav-btn:disabled{opacity:.6}
+.ask{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.ask .fav{position:static}
+.fav-btn.pdp{width:auto;height:auto;border-radius:10px;padding:10px 16px;gap:8px;display:inline-flex;align-items:center;border:1px solid var(--border);background:transparent;box-shadow:none;color:var(--text);font-weight:600;font-size:14px;font-family:inherit}
+.fav-btn.pdp.on{border-color:var(--accent);color:var(--accent)}
+.fav-btn.pdp:hover{transform:none;border-color:var(--primary)}
+.favnote{margin-top:20px;font-size:14px}
+
+/* Шапка на вузьких екранах: логотип + іконки в першому рядку, пошук на всю ширину нижче */
+@media(max-width:640px){
+  header.main .wrap{flex-wrap:wrap;gap:10px 12px}
+  .icons{margin-left:auto}
+  .search{order:3;flex:1 1 100%}
+}

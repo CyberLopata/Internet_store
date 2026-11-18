@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Обране — {{ SHOP.name }}{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{% url 'index' %}">Головна</a> › Обране</nav>
+<h1 class="ptitle">Обране{% if products %} <span class="muted">({{ products|length }})</span>{% endif %}</h1>
+{% if products %}
+<div class="grid" data-fav-page>
+  {% for p in products %}{% include "partials/_product_card.html" %}{% endfor %}
+</div>
+{% if not user.is_authenticated %}<p class="muted favnote">Обране зберігається в цьому браузері. <a class="linkish" href="{% url 'login' %}?next={% url 'favorites' %}">Увійдіть</a> або <a class="linkish" href="{% url 'register' %}?next={% url 'favorites' %}">зареєструйтесь</a>, щоб воно було доступне на всіх пристроях.</p>{% endif %}
+{% else %}
+<div class="empty">
+  <p>Тут поки порожньо. Натискайте ♡ на товарах, щоб зберегти їх, і повертайтеся пізніше.</p>
+  <a class="cta-outline" href="{% url 'catalog' %}">До каталогу</a>
+</div>
+{% endif %}
+{% endblock %}

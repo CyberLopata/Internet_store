@@ -412,3 +412,20 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f"{'Продавець' if self.seller else 'Покупець'}: {self.text[:40]}"
+
+
+class Favorite(models.Model):
+    """Товар в обраному покупця (для гостей обране тримається в сесії)."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorites")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="favorited_by")
+    created = models.DateTimeField("Додано", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created", "-id"]
+        verbose_name = "Обраний товар"
+        verbose_name_plural = "Обране"
+        constraints = [models.UniqueConstraint(fields=["user", "product"], name="uniq_favorite_per_user")]
+
+    def __str__(self):
+        return f"{self.user} ♥ {self.product}"
