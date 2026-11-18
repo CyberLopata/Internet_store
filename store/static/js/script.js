@@ -126,27 +126,60 @@
   if (mq && mq.addEventListener) mq.addEventListener("change", paint);
 })();
 
-/* Галерея фото на сторінці товару: мініатюри, стрілки, клавіші ←/→ і свайп. */
+/* Галерея фото на сторінці товару: мініатюри, стрілки, клавіші ←/→ і свайп.
+   Набір фото можна підмінити через box.gallery.set([...]) — так фото змінюються при виборі кольору. */
 (function () {
   var box = document.querySelector("[data-gallery]");
   if (!box) return;
-  var main = box.querySelector("[data-gallery-main]"),
-      thumbs = box.querySelectorAll("[data-gallery-thumb]");
-  if (!main || thumbs.length < 2) return;
+  var main = box.querySelector("[data-gallery-main]");
+  if (!main) return;
+  var pimg = box.querySelector(".pimg"), strip = box.querySelector(".gthumbs"),
+      emoji = box.querySelector("[data-gallery-emoji]"), navs = box.querySelectorAll("[data-gallery-step]");
+  var urls = Array.prototype.map.call(box.querySelectorAll("[data-gallery-thumb]"), function (t) { return t.dataset.src; });
+  if (!urls.length && !main.hidden && main.getAttribute("src")) urls = [main.getAttribute("src")];
   var cur = 0, startX = null;
 
+  function thumbs() { return strip ? strip.querySelectorAll("[data-gallery-thumb]") : []; }
   function show(i) {
-    cur = (i + thumbs.length) % thumbs.length;
-    main.src = thumbs[cur].dataset.src;
-    thumbs.forEach(function (t, j) {
+    if (!urls.length) return;
+    cur = (i + urls.length) % urls.length;
+    main.src = urls[cur];
+    thumbs().forEach(function (t, j) {
       t.classList.toggle("on", j === cur);
       if (j === cur) t.scrollIntoView({ block: "nearest", inline: "nearest" });
     });
   }
-  thumbs.forEach(function (t, j) {
-    t.addEventListener("click", function () { show(j); });
+  function render() {
+    var many = urls.length > 1;
+    if (strip) {
+      strip.textContent = "";
+      if (many) urls.forEach(function (u, j) {
+        var b = document.createElement("button"), im = document.createElement("img");
+        b.type = "button"; b.className = "gthumb"; b.dataset.galleryThumb = ""; b.dataset.src = u;
+        b.setAttribute("aria-label", "Фото " + (j + 1));
+        im.src = u; im.alt = ""; im.loading = "lazy"; b.appendChild(im); strip.appendChild(b);
+      });
+      strip.hidden = !many;
+    }
+    navs.forEach(function (n) { n.hidden = !many; });
+    var any = urls.length > 0;
+    main.hidden = !any;
+    pimg.classList.toggle("has-img", any);
+    pimg.style.background = any ? "" : (pimg.dataset.bg || "");
+    if (emoji) emoji.hidden = any;
+  }
+  function set(list) {
+    list = list.slice();
+    if (list.join("|") === urls.join("|")) return;
+    urls = list; render(); show(0);
+    urls.forEach(function (u) { new Image().src = u; });  // підвантажуємо наперед, щоб зміна була миттєвою
+  }
+
+  if (strip) strip.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-gallery-thumb]");
+    if (t) show(Array.prototype.indexOf.call(thumbs(), t));
   });
-  box.querySelectorAll("[data-gallery-step]").forEach(function (b) {
+  navs.forEach(function (b) {
     b.addEventListener("click", function () { show(cur + parseInt(b.dataset.galleryStep, 10)); });
   });
   box.addEventListener("keydown", function (e) {
@@ -158,8 +191,9 @@
     if (startX === null) return;
     var dx = e.changedTouches[0].clientX - startX;
     startX = null;
-    if (Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1));
+    if (urls.length > 1 && Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1));
   });
+  box.gallery = { set: set, urls: function () { return urls.slice(); }, show: show };
 })();
 
 /* Збільшення фото товару: клік по фото відкриває повноекранний перегляд зі стрілками,
@@ -169,7 +203,6 @@
   var main = document.querySelector("[data-gallery-main]");
   if (!main) return;
   var gallery = main.closest("[data-gallery]"),
-      thumbs = gallery ? gallery.querySelectorAll("[data-gallery-thumb]") : [],
       lb, stage, img, count, closeBtn, prevBtn, nextBtn,
       urls = [], idx = 0, startIdx = 0, zoomed = false, baseRect = null,
       startX = null, startY = 0, handled = false, lastFocus = null;
@@ -268,7 +301,7 @@
   }
   function open() {
     if (!lb) build();
-    urls = Array.prototype.map.call(thumbs, function (t) { return t.dataset.src; });
+    urls = gallery && gallery.gallery ? gallery.gallery.urls() : [];
     if (!urls.length) urls = [main.getAttribute("src")];
     startIdx = Math.max(0, urls.indexOf(main.getAttribute("src")));
     lastFocus = document.activeElement;
@@ -283,7 +316,7 @@
     lb.hidden = true;
     resetZoom();
     document.body.style.overflow = "";
-    if (idx !== startIdx && thumbs[idx]) thumbs[idx].click(); // галерея на сторінці показує те саме фото
+    if (idx !== startIdx && gallery && gallery.gallery) gallery.gallery.show(idx); // галерея на сторінці показує те саме фото
     if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
   }
 

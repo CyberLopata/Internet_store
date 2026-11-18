@@ -328,3 +328,6 @@ a.rate:hover{color:var(--primary)}
 .add.soldout{display:block;text-align:center;background:var(--surface);color:var(--muted);border:1px solid var(--border);cursor:default}
 .vnojs select{margin-left:6px;padding:6px}
 .buy{flex-wrap:wrap}
+
+/* ---- Фото за кольором ---- */
+.gnav[hidden],.gthumbs[hidden],.pimg img[hidden]{display:none}

@@ -5,16 +5,17 @@
 
 <div class="pdp">
   <div class="pgallery" data-gallery>
-    <div class="pimg{% if gallery %} has-img{% endif %}"{% if not gallery %} style="background:{{ product.color }}"{% endif %}>
+    <div class="pimg{% if gallery %} has-img{% endif %}" data-bg="{{ product.color }}"{% if not gallery %} style="background:{{ product.color }}"{% endif %}>
       {% if product.discount_percent %}<span class="pdisc">−{{ product.discount_percent }}%</span>{% endif %}
-      {% if gallery %}<img src="{{ gallery.0 }}" alt="{{ product.name }}" data-gallery-main>{% else %}{{ product.emoji }}{% endif %}
-      {% if gallery|length > 1 %}
-      <button type="button" class="gnav prev" data-gallery-step="-1" aria-label="Попереднє фото">‹</button>
-      <button type="button" class="gnav next" data-gallery-step="1" aria-label="Наступне фото">›</button>
+      {% if has_photos %}<img {% if gallery %}src="{{ gallery.0 }}"{% else %}hidden{% endif %} alt="{{ product.name }}" data-gallery-main>{% endif %}
+      {% if not gallery %}<span data-gallery-emoji>{{ product.emoji }}</span>{% endif %}
+      {% if has_photos %}
+      <button type="button" class="gnav prev" data-gallery-step="-1" aria-label="Попереднє фото"{% if gallery|length < 2 %} hidden{% endif %}>‹</button>
+      <button type="button" class="gnav next" data-gallery-step="1" aria-label="Наступне фото"{% if gallery|length < 2 %} hidden{% endif %}>›</button>
       {% endif %}
     </div>
-    {% if gallery|length > 1 %}
-    <div class="gthumbs">
+    {% if has_photos %}
+    <div class="gthumbs"{% if gallery|length < 2 %} hidden{% endif %}>
       {% for url in gallery %}<button type="button" class="gthumb{% if forloop.first %} on{% endif %}" data-gallery-thumb data-src="{{ url }}" aria-label="Фото {{ forloop.counter }}"><img src="{{ url }}" alt="" loading="lazy"></button>{% endfor %}
     </div>
     {% endif %}
@@ -115,4 +116,4 @@
 <div class="grid">{% for p in related %}{% include "partials/_product_card.html" %}{% endfor %}</div>
 {% endif %}
 {% endblock %}
-{% block extra_js %}{% load static %}{% if variants_data %}{{ variants_data|json_script:"variants-data" }}<script src="{% static 'js/variants.js' %}"></script>{% endif %}{% endblock %}
+{% block extra_js %}{% load static %}{% if variants_data %}{{ variants_data|json_script:"variants-data" }}{% if gallery_colors %}{{ gallery_colors|json_script:"gallery-colors" }}{% endif %}<script src="{% static 'js/variants.js' %}"></script>{% endif %}{% endblock %}

@@ -80,8 +80,25 @@ class ProductVariantInline(admin.TabularInline):
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 0
-    fields = ("preview", "image", "order")
+    fields = ("preview", "image", "color", "order")
     readonly_fields = ("preview",)
+
+    def get_formset(self, request, obj=None, **kwargs):
+        FormSet = super().get_formset(request, obj, **kwargs)
+        colors = list(dict.fromkeys(v.color_name for v in obj.variants.all() if v.color_name)) if obj else []
+
+        class ColorFormSet(FormSet):
+            def add_fields(self, form, index):
+                super().add_fields(form, index)
+                current = form.instance.color if form.instance.pk else ""
+                choices = [("", "Для всіх (нейтральне)")] + [(c, c) for c in colors]
+                if current and current not in colors:
+                    choices.append((current, f"{current} (такого кольору вже немає у варіантах)"))
+                form.fields["color"] = forms.ChoiceField(
+                    label="Колір", required=False, choices=choices,
+                    help_text="Колір береться з варіантів товару (спочатку додайте їх вище й збережіть).",
+                )
+        return ColorFormSet
 
     @admin.display(description="Перегляд")
     def preview(self, obj):
@@ -135,18 +152,9 @@ class ProductAdmin(admin.ModelAdmin):
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    readonly_fields = ("product_image", "product", "product_name", "variant_label", "price", "quantity")
-    fields = ("product_image", "product", "product_name", "variant_label", "price", "quantity")
+    readonly_fields = ("product", "product_name", "variant_label", "price", "quantity")
+    fields = ("product", "product_name", "variant_label", "price", "quantity")
     can_delete = False
-
-    @admin.display(description="Фото")
-    def product_image(self, obj):
-        if obj.product and obj.product.image:
-            return format_html(
-                '<img src="{}" style="height:80px;width:80px;object-fit:cover;border-radius:6px">',
-                obj.product.image.url,
-            )
-        return "—"
 
 
 @admin.register(Order)

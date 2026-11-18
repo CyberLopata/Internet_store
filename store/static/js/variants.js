@@ -8,6 +8,16 @@
   var priceEl = document.querySelector(".pprice b"), basePrice = priceEl ? priceEl.textContent : "";
   var btnText = btn.textContent;
   var sel = { color: null, size: null };
+  var galleryBox = document.querySelector("[data-gallery]"), photosEl = document.getElementById("gallery-colors");
+  var colorPhotos = photosEl ? JSON.parse(photosEl.textContent) : {}, neutral = null;
+
+  // Фото кольору показуються лише коли цей колір обрано; без вибору (або без власних фото) — нейтральні.
+  function syncPhotos() {
+    var api = galleryBox && galleryBox.gallery;
+    if (!api || !photosEl) return;
+    if (neutral === null) neutral = api.urls();
+    api.set(sel.color && colorPhotos[sel.color] ? colorPhotos[sel.color] : neutral);
+  }
 
   function uniq(key) {
     var seen = {}, out = [];
@@ -82,6 +92,7 @@
       if (axes.color.length && !sel.color) need.push("колір");
       btn.textContent = "Оберіть " + need.join(" і ");
     }
+    syncPhotos();
     if (priceEl) priceEl.textContent = cur ? fmt(cur.price) : basePrice;
     if (qty) { var max = ready ? Math.min(99, cur.stock) : 99; qty.max = max; if (+qty.value > max) qty.value = max; }
     status.className = "vstatus" + (cur ? (ready ? (cur.stock <= 5 ? " low" : " ok") : " out") : "");

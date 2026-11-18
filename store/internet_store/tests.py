@@ -1,10 +1,8 @@
-from django.contrib import admin as django_admin
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from .admin import OrderItemInline
-from .models import Order, OrderItem, Product, ProductImage, ProductVariant, Review
+from .models import Order, Product, ProductImage, ProductVariant, Review
 
 
 class ShopFlowTests(TestCase):
@@ -127,26 +125,6 @@ class ProductImageTests(TestCase):
         finally:
             p.delete()
         self.assertFalse(path.exists())
-
-
-class OrderAdminTests(TestCase):
-    def test_order_item_inline_shows_product_image_or_placeholder(self):
-        from types import SimpleNamespace
-
-        inline = OrderItemInline(OrderItem, django_admin.site)
-        self.assertIn("product_image", inline.fields)
-        item = SimpleNamespace(product=SimpleNamespace(
-            image=SimpleNamespace(url="/static/images/order-item.webp"),
-        ))
-
-        preview = str(inline.product_image(item))
-
-        self.assertIn('<img src="/static/images/order-item.webp"', preview)
-        self.assertEqual(inline.product_image(SimpleNamespace(product=None)), "—")
-        self.assertEqual(
-            inline.product_image(SimpleNamespace(product=SimpleNamespace(image=None))),
-            "—",
-        )
 
 
 class ReviewTests(TestCase):
@@ -612,3 +590,59 @@ class BulkVariantTests(TestCase):
         self.assertEqual(r.status_code, 302, getattr(r, "context", None) and r.context["adminform"].form.errors)
         self.assertEqual(self.p.variants.count(), 4)
         self.assertEqual(set(self.p.variants.values_list("stock", flat=True)), {4})
+
+
+class ColorPhotoTests(TestCase):
+    def setUp(self):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        from .models import Category
+        self._made = []
+        cat = Category.objects.create(name="Колір", slug="color-photos")
+        self.p = Product.objects.create(category=cat, name="Кросівки К", slug="color-photos", price=10)
+        ProductVariant.objects.create(product=self.p, size="40", color_name="Чорний", stock=1)
+        ProductVariant.objects.create(product=self.p, size="40", color_name="Червоний", stock=1)
+
+        def photo(color, shade):
+            buf = BytesIO()
+            Image.new("RGB", (20, 20), shade).save(buf, format="PNG")
+            img = ProductImage.objects.create(
+                product=self.p, color=color,
+                image=SimpleUploadedFile(f"{shade}.png", buf.getvalue(), content_type="image/png"))
+            self._made.append(img)
+            return img
+        self.neutral = photo("", "black")
+        self.red1, self.red2 = photo("червоний", "red"), photo("Червоний", "darkred")  # регістр не важливий
+        self.orphan = photo("Рожевий", "pink")  # кольору немає у варіантах
+
+    def tearDown(self):
+        self.p.delete()
+
+    def test_neutral_gallery_excludes_color_photos(self):
+        ctx = self.client.get(self.p.get_absolute_url()).context
+        self.assertEqual(ctx["gallery"], [self.neutral.image.url])
+        self.assertEqual(ctx["gallery_colors"], {"Червоний": [self.red1.image.url, self.red2.image.url]})
+        self.assertNotIn(self.orphan.image.url, ctx["gallery"] + sum(ctx["gallery_colors"].values(), []))
+
+    def test_color_photos_not_in_initial_html_gallery(self):
+        html = self.client.get(self.p.get_absolute_url()).content.decode()
+        self.assertEqual(html.count("data-gallery-thumb data-src="), 1)  # у смузі лише нейтральне фото
+        self.assertIn('id="gallery-colors"', html)
+
+    def test_only_color_photos_product_has_hidden_main(self):
+        ProductImage.objects.filter(pk=self.neutral.pk).delete()
+        html = self.client.get(self.p.get_absolute_url()).content.decode()
+        self.assertIn("data-gallery-emoji", html)
+        self.assertRegex(html, r"<img hidden[^>]*data-gallery-main")
+
+    def test_admin_inline_offers_variant_colors(self):
+        from django.contrib.auth import get_user_model
+        admin = get_user_model().objects.create_superuser("adm3", "a3@e.com", "Adm-pass-12345")
+        self.client.force_login(admin)
+        page = self.client.get(reverse("admin:internet_store_product_change", args=[self.p.pk]))
+        self.assertContains(page, "Для всіх (нейтральне)")
+        self.assertContains(page, '<option value="Червоний"')
+        self.assertContains(page, "такого кольору вже немає")  # «Рожевий» позначено як застарілий

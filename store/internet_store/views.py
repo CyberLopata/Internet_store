@@ -82,8 +82,14 @@ def product_detail(request, slug):
         review.save()
         return redirect(f"{product.get_absolute_url()}?reviewed=1#reviews")
 
-    gallery = [product.image.url] if product.image else []
-    gallery.extend(photo.image.url for photo in product.photos.all() if photo.image)
+    photos = [p for p in product.photos.all() if p.image]
+    # нейтральні фото показуються одразу; фото кольору — лише коли покупець обирає цей колір
+    gallery = ([product.image.url] if product.image else []) + [p.image.url for p in photos if not p.color]
+    gallery_colors = {}
+    for name in dict.fromkeys(v.color_name for v in product.active_variants if v.color_name):
+        urls = [p.image.url for p in photos if p.color.lower() == name.lower()]
+        if urls:
+            gallery_colors[name] = urls
     reviews = product.reviews.filter(is_published=True)
     review_stats = reviews.aggregate(total=Count("pk"), average=Avg("rating"))
     variants_data = [{
@@ -95,6 +101,8 @@ def product_detail(request, slug):
         "variants_data": variants_data,
         "related": related,
         "gallery": gallery,
+        "gallery_colors": gallery_colors,
+        "has_photos": bool(gallery or gallery_colors),
         "reviews": reviews,
         "reviews_total": review_stats["total"],
         "rating_avg": review_stats["average"],

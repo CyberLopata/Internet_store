@@ -152,6 +152,10 @@ class ProductImage(models.Model):
         help_text="JPG, PNG, GIF або WebP до 10 МБ. Автоматично зберігається як WebP у static/images/.",
     )
     order = models.PositiveSmallIntegerField("Порядок", default=0)
+    color = models.CharField(
+        "Колір", max_length=60, blank=True,
+        help_text="Порожньо — фото для всіх (показується одразу). Якщо вибрати колір, фото з'явиться лише коли покупець обере цей колір.",
+    )
 
     class Meta:
         ordering = ["order", "pk"]
