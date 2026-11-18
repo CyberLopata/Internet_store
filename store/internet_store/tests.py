@@ -633,7 +633,7 @@ class ColorPhotoTests(TestCase):
         self.assertIn('id="gallery-colors"', html)
 
     def test_only_color_photos_product_has_hidden_main(self):
-        ProductImage.objects.filter(pk=self.neutral.pk).delete()
+        self.neutral.delete()  # саме через екземпляр: так видаляється і файл
         html = self.client.get(self.p.get_absolute_url()).content.decode()
         self.assertIn("data-gallery-emoji", html)
         self.assertRegex(html, r"<img hidden[^>]*data-gallery-main")
