@@ -354,3 +354,14 @@ a.rate:hover{color:var(--primary)}
   .icons{margin-left:auto}
   .search{order:3;flex:1 1 100%}
 }
+
+/* ---- Нещодавно переглянуті ---- */
+.recent{margin-top:8px}
+.recent-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.recent-head form{margin:0}
+.linkbtn{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-family:inherit;font-size:14px}
+.linkbtn:hover{color:var(--text)}
+@media(max-width:640px){
+  .recent .grid{grid-auto-flow:column;grid-auto-columns:72%;grid-template-columns:none;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 8px;scroll-padding:0 16px}
+  .recent .card{scroll-snap-align:start}
+}

@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 
 from .cart import Cart
 from .forms import CheckoutForm, ReviewForm
+from . import recent as recent_views
 from .models import Category, Order, OrderItem, Product, ProductVariant, get_profile
 
 PAGE_SIZE = 12
@@ -31,6 +32,7 @@ def index(request):
         "tabs": tabs,
         "active_tab": tab,
         "tiles": Category.objects.filter(parent__isnull=True),
+        "recent": recent_views.recent_products(request),
     })
 
 
@@ -71,6 +73,8 @@ def catalog(request, slug=None):
 def product_detail(request, slug):
     product = get_object_or_404(Product.objects.select_related("category").prefetch_related("variants"), slug=slug, is_active=True)
     related = Product.objects.filter(category=product.category, is_active=True).exclude(pk=product.pk).prefetch_related("variants")[:4]
+    recent = recent_views.recent_products(request, exclude=product.pk)
+    recent_views.remember(request, product)
     initial = {"name": request.user.first_name} if request.user.is_authenticated else None
     form = ReviewForm(request.POST if request.method == "POST" else None, initial=initial)
     just_reviewed = False
@@ -102,6 +106,7 @@ def product_detail(request, slug):
         "related": related,
         "gallery": gallery,
         "gallery_colors": gallery_colors,
+        "recent": recent,
         "has_photos": bool(gallery or gallery_colors),
         "reviews": reviews,
         "reviews_total": review_stats["total"],
@@ -116,6 +121,12 @@ def _back(request, fallback="cart"):
     if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
         return redirect(nxt)
     return redirect(fallback)
+
+
+@require_POST
+def recent_clear(request):
+    recent_views.clear(request)
+    return _back(request, fallback="index")
 
 
 def _is_ajax(request):

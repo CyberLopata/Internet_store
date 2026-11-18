@@ -737,3 +737,79 @@ class FavoriteTests(TestCase):
         u = get_user_model().objects.create_user("n@example.com", "n@example.com", "Nav-pass-12345")
         self.client.force_login(u)
         self.assertContains(self.client.get(reverse("account")), reverse("favorites"))
+
+
+class RecentlyViewedTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_shop", verbosity=0)
+        cls.products = list(Product.objects.all()[:4])
+
+    def view(self, p):
+        return self.client.get(p.get_absolute_url())
+
+    def recent_pks(self, response):
+        return [p.pk for p in response.context["recent"]]
+
+    def test_empty_history_shows_nothing(self):
+        r = self.client.get(reverse("index"))
+        self.assertEqual(r.context["recent"], [])
+        self.assertNotContains(r, "Нещодавно переглянуті")
+
+    def test_records_newest_first_and_dedupes(self):
+        a, b, c = self.products[:3]
+        self.view(a); self.view(b); self.view(c); self.view(a)
+        self.assertEqual(self.recent_pks(self.client.get(reverse("index"))), [a.pk, c.pk, b.pk])
+
+    def test_current_product_excluded_on_its_own_page(self):
+        a, b = self.products[:2]
+        self.view(a)
+        r = self.view(b)
+        self.assertEqual(self.recent_pks(r), [a.pk])
+        self.assertContains(r, "Нещодавно переглянуті")
+        self.assertEqual(self.recent_pks(self.view(a)), [b.pk])
+
+    def test_first_view_has_no_block_on_pdp(self):
+        self.assertNotContains(self.view(self.products[0]), "Нещодавно переглянуті")
+
+    def test_inactive_hidden_and_cap_stored(self):
+        a, b = self.products[:2]
+        self.view(a); self.view(b)
+        Product.objects.filter(pk=a.pk).update(is_active=False)
+        self.assertEqual(self.recent_pks(self.client.get(reverse("index"))), [b.pk])
+        from .recent import MAX_STORED, remember
+        from django.test import RequestFactory
+        from django.contrib.sessions.backends.db import SessionStore
+        req = RequestFactory().get("/")
+        req.session = SessionStore()
+        for i in range(1, 40):
+            remember(req, Product(pk=i))
+        self.assertEqual(len(req.session["recent"]), MAX_STORED)
+        self.assertEqual(req.session["recent"][0], 39)
+
+    def test_clear_and_safe_redirect(self):
+        a, b = self.products[:2]
+        self.view(a); self.view(b)
+        r = self.client.post(reverse("recent_clear"), {"next": "/catalog/"})
+        self.assertRedirects(r, "/catalog/", fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse("index")).context["recent"], [])
+        r = self.client.post(reverse("recent_clear"), {"next": "https://evil.com/"})
+        self.assertRedirects(r, reverse("index"), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse("recent_clear")).status_code, 405)
+
+    def test_history_is_per_visitor_and_survives_login(self):
+        from django.contrib.auth import get_user_model
+        a = self.products[0]
+        self.view(a)
+        self.assertEqual(self.client_class().get(reverse("index")).context["recent"], [])
+        u = get_user_model().objects.create_user("r@example.com", "r@example.com", "Rec-pass-12345")
+        self.client.force_login(u)
+        self.assertEqual(self.recent_pks(self.client.get(reverse("index"))), [a.pk])
+
+    def test_limit_six_on_page(self):
+        from .models import Category
+        cat = Category.objects.first()
+        extra = [Product.objects.create(category=cat, name=f"Т{i}", slug=f"t-{i}", price=1) for i in range(8)]
+        for p in extra:
+            self.view(p)
+        self.assertEqual(len(self.client.get(reverse("index")).context["recent"]), 6)

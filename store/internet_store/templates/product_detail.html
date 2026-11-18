@@ -115,5 +115,7 @@
 <h2>Схожі товари</h2>
 <div class="grid">{% for p in related %}{% include "partials/_product_card.html" %}{% endfor %}</div>
 {% endif %}
+
+{% include "partials/_recent.html" %}
 {% endblock %}
 {% block extra_js %}{% load static %}{% if variants_data %}{{ variants_data|json_script:"variants-data" }}{% if gallery_colors %}{{ gallery_colors|json_script:"gallery-colors" }}{% endif %}<script src="{% static 'js/variants.js' %}"></script>{% endif %}{% endblock %}

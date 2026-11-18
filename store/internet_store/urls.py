@@ -33,6 +33,7 @@ urlpatterns = [
     path("account/reset/done/", acc.PasswordResetComplete.as_view(), name="password_reset_complete"),
     path("account/reset/<uidb64>/<token>/", acc.PasswordResetConfirm.as_view(), name="password_reset_confirm"),
 
+    path("recent/clear/", views.recent_clear, name="recent_clear"),
     path("favorites/", fav.favorites_page, name="favorites"),
     path("favorites/toggle/<int:pk>/", fav.favorite_toggle, name="favorite_toggle"),
     path("chat/messages/", chat.customer_messages, name="chat_messages"),

@@ -1,0 +1,12 @@
+{% if recent %}
+<section class="recent" aria-labelledby="recent-h">
+  <div class="recent-head">
+    <h2 id="recent-h">Нещодавно переглянуті</h2>
+    <form method="post" action="{% url 'recent_clear' %}">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="linkbtn">Очистити</button>
+    </form>
+  </div>
+  <div class="grid">{% for p in recent %}{% include "partials/_product_card.html" %}{% endfor %}</div>
+</section>
+{% endif %}
