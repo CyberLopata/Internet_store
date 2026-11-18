@@ -9,7 +9,7 @@
     {% if not p.in_stock %}
     <span class="add soldout">Немає в наявності</span>
     {% elif p.has_variants %}
-    <a class="add" href="{{ p.get_absolute_url }}">Обрати розмір / колір</a>
+    <a class="add" href="{{ p.get_absolute_url }}">До кошика</a>
     {% else %}
     <form method="post" action="{% url 'cart_add' p.pk %}">{% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">

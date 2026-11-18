@@ -491,7 +491,7 @@ class VariantTests(TestCase):
         self.assertContains(page, 'id="variants-data"')
         self.assertContains(page, "variants.js")
         card = self.client.get(reverse("catalog"))
-        self.assertContains(card, "Обрати розмір / колір")
+        self.assertContains(card, f'<a class="add" href="{self.p.get_absolute_url()}">До кошика</a>')
 
     def test_product_all_sold_out(self):
         ProductVariant.objects.filter(product=self.p).update(stock=0)
