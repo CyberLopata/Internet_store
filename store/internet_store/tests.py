@@ -960,3 +960,14 @@ class NovaPoshtaTests(TestCase):
         with self.settings(NOVA_POSHTA_API_KEY="k"):
             self.client.post("/cart/add/%d/" % self.p.pk)
             self.assertContains(self.client.get("/checkout/"), "data-np-cities")
+
+
+class NovaPoshtaProfileTests(TestCase):
+    def test_profile_has_picker_when_enabled(self):
+        from django.contrib.auth.models import User
+        User.objects.create_user("u", "u@x.com", "pw12345678")
+        self.client.login(username="u", password="pw12345678")
+        with self.settings(NOVA_POSHTA_API_KEY="k"):
+            self.assertContains(self.client.get("/account/"), "data-np-cities")
+        with self.settings(NOVA_POSHTA_API_KEY=""):
+            self.assertNotContains(self.client.get("/account/"), "data-np-cities")

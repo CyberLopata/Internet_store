@@ -1,3 +1,4 @@
+from . import novaposhta
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -50,7 +51,7 @@ def account(request):
         form.save()
         messages.success(request, "Дані збережено.")
         return redirect("account")
-    return render(request, "account/profile.html", {"form": form, "section": "profile"})
+    return render(request, "account/profile.html", {"form": form, "section": "profile", "np_enabled": novaposhta.enabled()})
 
 
 @login_required

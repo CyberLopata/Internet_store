@@ -6,7 +6,7 @@
   {% include "partials/_account_nav.html" %}
   <section class="account-card">
     <h2>Мої дані</h2>
-    <form method="post" class="form">{% csrf_token %}
+    <form method="post" class="form"{% if np_enabled %} id="checkout-form" data-np-optional="1" data-np-cities="{% url 'np_cities' %}" data-np-warehouses="{% url 'np_warehouses' %}"{% endif %}>{% csrf_token %}
       {% for e in form.non_field_errors %}<div class="err">{{ e }}</div>{% endfor %}
       <div class="form-grid">
         {% include "partials/_field.html" with field=form.first_name %}
@@ -21,3 +21,4 @@
   </section>
 </div>
 {% endblock %}
+{% block extra_js %}{% if np_enabled %}{% load static %}<script src="{% static 'js/novaposhta.js' %}"></script>{% endif %}{% endblock %}

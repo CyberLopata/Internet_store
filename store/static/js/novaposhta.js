@@ -99,6 +99,7 @@
 
   form.addEventListener('submit', function (e) {
     if (manual || broken) return;
+    if (form.dataset.npOptional && !city.value && !addr.value) return;  /* у кабінеті поля необов'язкові */
     if (!city.value || !addr.value || !pickedAddr || addr.value !== pickedAddr || city.value !== pickedCity) {
       e.preventDefault(); msg.textContent = 'Оберіть місто та відділення зі списку.'; msg.hidden = false;
       (city.value && pickedCity === city.value ? addr : city).focus();
