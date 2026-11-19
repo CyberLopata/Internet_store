@@ -1,8 +1,8 @@
 <div class="top"><div class="wrap"><span>📍 Київ · Доставка по всій Україні</span><span>☎ {{ SHOP.phone }} (безкоштовно) · Пн–Нд 9:00–18:00</span></div></div>
 <header class="main"><div class="wrap">
   <a class="logo" href="{% url 'index' %}">{{ SHOP.name }}</a>
-  <form class="search" action="{% url 'catalog' %}" method="get">
-    <input name="q" value="{{ q|default:'' }}" placeholder="Пошук товарів…" aria-label="Пошук">
+  <form class="search" action="{% url 'catalog' %}" method="get" role="search" data-suggest-url="{% url 'search_suggest' %}">
+    <input name="q" value="{{ q|default:'' }}" placeholder="Пошук товарів…" aria-label="Пошук" autocomplete="off">
     <button type="submit">Знайти</button>
   </form>
   <div class="icons">

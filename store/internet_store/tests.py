@@ -813,3 +813,90 @@ class RecentlyViewedTests(TestCase):
         for p in extra:
             self.view(p)
         self.assertEqual(len(self.client.get(reverse("index")).context["recent"]), 6)
+
+
+class LiveSearchTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from .models import Category
+        cat = Category.objects.create(name="Взуття", slug="vzuttya")
+        other = Category.objects.create(name="Дім", slug="dim")
+        mk = lambda name, slug, c=cat, **kw: Product.objects.create(category=c, name=name, slug=slug, price=kw.pop("price", 100), **kw)
+        cls.runner = mk("Кросівки Runner", "runner", description="Легкі для бігу")
+        cls.nike = mk("Nike Кросівки Air", "nike", price=200, old_price=300)
+        cls.boots = mk("Черевики зимові", "boots", description="Теплі, як кросівки взимку")
+        cls.blanket = mk("Ковдра «Літо»", "blanket", c=other)
+        cls.hidden = mk("Кросівки приховані", "hidden", is_active=False)
+
+    def get(self, q):
+        return self.client.get(reverse("search_suggest"), {"q": q}).json()
+
+    def names(self, q):
+        return [r["name"] for r in self.get(q)["results"]]
+
+    def test_too_short_returns_nothing(self):
+        self.assertEqual(self.get("к"), {"q": "к", "total": 0, "results": []})
+        self.assertEqual(self.get("  "), {"q": "", "total": 0, "results": []})
+
+    def test_case_insensitive_cyrillic_and_inactive_excluded(self):
+        self.assertEqual(set(self.names("КРОСІВКИ")), {"Кросівки Runner", "Nike Кросівки Air", "Черевики зимові"})
+        self.assertNotIn("Кросівки приховані", self.names("кросівки"))
+
+    def test_ranking_prefix_first_then_name_then_description(self):
+        self.assertEqual(self.names("кросівки"), ["Кросівки Runner", "Nike Кросівки Air", "Черевики зимові"])
+
+    def test_all_words_must_match_and_category_counts(self):
+        self.assertEqual(self.names("кросівки runner"), ["Кросівки Runner"])
+        self.assertEqual(self.names("взуття nike"), ["Nike Кросівки Air"])  # слово з назви категорії
+        self.assertEqual(self.names("кросівки qwerty"), [])
+
+    def test_quotes_and_prefix_of_inner_word(self):
+        self.assertEqual(self.names("літо"), ["Ковдра «Літо»"])
+
+    def test_limit_and_total(self):
+        from .models import Category
+        cat = Category.objects.get(slug="vzuttya")
+        for i in range(10):
+            Product.objects.create(category=cat, name=f"Сандалі {i}", slug=f"sandali-{i}", price=1)
+        data = self.get("сандалі")
+        self.assertEqual((len(data["results"]), data["total"]), (6, 10))
+
+    def test_payload_fields(self):
+        r = self.get("nike")["results"][0]
+        self.assertEqual(r["url"], self.nike.get_absolute_url())
+        self.assertEqual((r["price"], r["old_price"]), ("200 ₴", "300 ₴"))
+        self.assertEqual((r["category"], r["in_stock"]), ("Взуття", True))
+
+    def test_out_of_stock_flag_and_sorted_after_in_stock(self):
+        sold = Product.objects.create(category=self.runner.category, name="Сандалі Z", slug="sz", price=1)
+        ProductVariant.objects.create(product=sold, size="40", stock=0)
+        Product.objects.create(category=self.runner.category, name="Сандалі Y", slug="sy", price=1)
+        res = self.get("сандалі")["results"]
+        self.assertEqual([r["name"] for r in res], ["Сандалі Y", "Сандалі Z"])
+        self.assertFalse(res[1]["in_stock"])
+
+    def test_catalog_uses_same_search(self):
+        page = self.client.get(reverse("catalog"), {"q": "кросівки runner"})
+        self.assertEqual([p.name for p in page.context["page"]], ["Кросівки Runner"])
+        page = self.client.get(reverse("catalog"), {"q": "ковдра літо"})
+        self.assertEqual([p.name for p in page.context["page"]], ["Ковдра «Літо»"])
+
+    def test_get_only_and_header_wired(self):
+        self.assertEqual(self.client.post(reverse("search_suggest")).status_code, 405)
+        html = self.client.get(reverse("index")).content.decode()
+        self.assertIn('data-suggest-url="/search/suggest/"', html)
+        self.assertIn("search.js", html)
+
+    def test_very_long_query_is_safe(self):
+        self.assertEqual(self.client.get(reverse("search_suggest"), {"q": "я" * 5000}).status_code, 200)
+
+    def test_orm_branch_used_for_postgres(self):
+        """Гілка для PostgreSQL (icontains). Перевіряємо на ASCII-запитах, бо SQLite для кирилиці регістр не ігнорує."""
+        from unittest import mock
+
+        from .search import search_products
+        with mock.patch("internet_store.search.connection") as conn:
+            conn.vendor = "postgresql"
+            qs = search_products(Product.objects.filter(is_active=True), "nike air")
+            self.assertEqual([p.name for p in qs], ["Nike Кросівки Air"])
+            self.assertEqual(search_products(Product.objects.all(), "nike zzz").count(), 0)

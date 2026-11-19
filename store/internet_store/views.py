@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST
 from .cart import Cart
 from .forms import CheckoutForm, ReviewForm
 from . import recent as recent_views
+from .search import search_products
 from .models import Category, Order, OrderItem, Product, ProductVariant, get_profile
 
 PAGE_SIZE = 12
@@ -46,7 +47,7 @@ def catalog(request, slug=None):
         title = category.name
     q = request.GET.get("q", "").strip()
     if q:
-        products = products.filter(Q(name__icontains=q) | Q(description__icontains=q))
+        products = search_products(products, q)
         title = f"Пошук: {q}"
     if request.GET.get("sale"):
         products = products.filter(old_price__gt=F("price"))
