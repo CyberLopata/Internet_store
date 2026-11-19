@@ -8,7 +8,7 @@
 <p class="muted">Вже є акаунт? <a class="linkish" href="{% url 'login' %}?next={% url 'checkout' %}">Увійдіть</a>, щоб підставити свої дані й бачити історію замовлень. Або оформіть замовлення без реєстрації.</p>
 {% endif %}
 <div class="cart-layout">
-  <form method="post" class="form">{% csrf_token %}
+  <form method="post" class="form"{% if np_enabled %} id="checkout-form" data-np-cities="{% url 'np_cities' %}" data-np-warehouses="{% url 'np_warehouses' %}"{% endif %}>{% csrf_token %}
     {{ form.non_field_errors }}
     {% for f in form %}
     <div class="field">
@@ -27,3 +27,4 @@
   </aside>
 </div>
 {% endblock %}
+{% block extra_js %}{% if np_enabled %}{% load static %}<script src="{% static 'js/novaposhta.js' %}"></script>{% endif %}{% endblock %}

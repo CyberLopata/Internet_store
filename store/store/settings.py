@@ -165,3 +165,7 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '0') == '1'
 SELLER_NOTIFY_EMAIL = os.environ.get('SELLER_NOTIFY_EMAIL', '')  # куди слати лист про нове повідомлення в чаті
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'SHOP <noreply@shop.example>')
+
+# Нова пошта: вибір міста й відділення на сторінці оформлення (довідники, без ТТН).
+# Безкоштовний ключ: new.novaposhta.ua -> Налаштування -> Безпека -> Створити ключ. Без ключа поля лишаються звичайними.
+NOVA_POSHTA_API_KEY = os.environ.get('NOVA_POSHTA_API_KEY', '')

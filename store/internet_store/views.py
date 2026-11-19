@@ -8,6 +8,7 @@ from django.template.loader import render_to_string
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from . import novaposhta
 from .cart import Cart
 from .forms import CheckoutForm, ReviewForm
 from . import recent as recent_views
@@ -273,7 +274,7 @@ def checkout(request):
         cart.clear()
         request.session["last_order"] = order.pk
         return redirect("order_success", pk=order.pk)
-    return render(request, "checkout.html", {"form": form, "items": items, "total": sum(i["subtotal"] for i in items)})
+    return render(request, "checkout.html", {"np_enabled": novaposhta.enabled(), "form": form, "items": items, "total": sum(i["subtotal"] for i in items)})
 
 
 def order_success(request, pk):

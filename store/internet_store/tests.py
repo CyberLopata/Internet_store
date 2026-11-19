@@ -900,3 +900,63 @@ class LiveSearchTests(TestCase):
             qs = search_products(Product.objects.filter(is_active=True), "nike air")
             self.assertEqual([p.name for p in qs], ["Nike Кросівки Air"])
             self.assertEqual(search_products(Product.objects.all(), "nike zzz").count(), 0)
+
+
+class NovaPoshtaTests(TestCase):
+    CITIES = [{"Addresses": [
+        {"DeliveryCity": "ref-kyiv", "MainDescription": "Київ", "Present": "м. Київ, Київська обл.", "Warehouses": 300},
+        {"DeliveryCity": "ref-empty", "MainDescription": "Село", "Present": "с. Село", "Warehouses": 0},
+    ]}]
+    WH = [{"Ref": "w1", "Number": "5", "Description": "Відділення №5: вул. Хрещатик, 1"}, {"Ref": "", "Description": ""}]
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        call_command("seed_shop", verbosity=0)
+        self.p = Product.objects.filter(variants__isnull=True).first()
+
+    def test_disabled_without_key(self):
+        with self.settings(NOVA_POSHTA_API_KEY=""):
+            self.assertEqual(self.client.get("/np/cities/?q=Київ").status_code, 404)
+            self.client.post("/cart/add/%d/" % self.p.pk)
+            self.assertNotContains(self.client.get("/checkout/"), "data-np-cities")
+
+    def test_cities_filter_and_cache(self):
+        from unittest import mock
+        from . import novaposhta
+        with self.settings(NOVA_POSHTA_API_KEY="k"), mock.patch.object(novaposhta, "_call", return_value=self.CITIES) as m:
+            r = self.client.get("/np/cities/?q=Київ").json()
+            self.assertEqual([c["ref"] for c in r["results"]], ["ref-kyiv"])
+            self.client.get("/np/cities/?q=київ")
+            self.assertEqual(m.call_count, 1)  # другий запит з кешу
+            self.assertEqual(self.client.get("/np/cities/?q=К").json()["results"], [])
+
+    def test_warehouses(self):
+        from unittest import mock
+        from . import novaposhta
+        with self.settings(NOVA_POSHTA_API_KEY="k"), mock.patch.object(novaposhta, "_call", return_value=self.WH) as m:
+            r = self.client.get("/np/warehouses/?city=ref-kyiv&q=5").json()
+            self.assertEqual(len(r["results"]), 1)
+            self.assertEqual(r["results"][0]["number"], "5")
+            self.assertEqual(m.call_args[0][2]["CityRef"], "ref-kyiv")
+            self.assertEqual(self.client.get("/np/warehouses/").json()["results"], [])
+
+    def test_api_error_is_503(self):
+        from unittest import mock
+        from . import novaposhta
+        with self.settings(NOVA_POSHTA_API_KEY="k"), mock.patch.object(novaposhta, "_call", side_effect=novaposhta.NovaPoshtaError("x")):
+            self.assertEqual(self.client.get("/np/cities/?q=Київ").status_code, 503)
+
+    def test_call_parses_api_failure(self):
+        from unittest import mock
+        from . import novaposhta
+        fake = mock.MagicMock()
+        fake.__enter__.return_value.read.return_value = b'{"success": false, "errors": ["API key is invalid"]}'
+        with self.settings(NOVA_POSHTA_API_KEY="bad"), mock.patch("urllib.request.urlopen", return_value=fake):
+            with self.assertRaises(novaposhta.NovaPoshtaError):
+                novaposhta._call("Address", "getCities", {})
+
+    def test_checkout_has_picker_when_enabled(self):
+        with self.settings(NOVA_POSHTA_API_KEY="k"):
+            self.client.post("/cart/add/%d/" % self.p.pk)
+            self.assertContains(self.client.get("/checkout/"), "data-np-cities")
