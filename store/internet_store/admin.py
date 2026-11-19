@@ -6,7 +6,7 @@ from django.db.models import Max
 from django.utils.html import format_html
 
 from .variants import MAX_COMBINATIONS, combinations, create_variants, parse_list
-from .models import Category, ChatMessage, Favorite, ChatThread, Order, OrderItem, Product, ProductImage, ProductVariant, Profile, Review, validate_image_size
+from .models import Category, ChatMessage, Favorite, ChatThread, Order, OrderItem, Product, ProductImage, ProductVariant, Profile, Review, ReviewPhoto, validate_image_size
 
 User = get_user_model()
 
@@ -167,15 +167,46 @@ class OrderAdmin(admin.ModelAdmin):
     inlines = [OrderItemInline]
 
 
+class ReviewPhotoInline(admin.TabularInline):
+    model = ReviewPhoto
+    extra = 0
+    fields = ("preview", "image", "is_approved", "order")
+    readonly_fields = ("preview",)
+
+    @admin.display(description="Фото")
+    def preview(self, obj):
+        if obj.pk and obj.image:
+            return format_html('<a href="{0}" target="_blank"><img src="{0}" style="height:90px;border-radius:6px"></a>', obj.image.url)
+        return "—"
+
+
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
-    list_display = ("created", "product", "name", "rating", "short_text", "is_published")
+    inlines = [ReviewPhotoInline]
+    actions = ["approve_photos"]
+    list_display = ("created", "product", "name", "rating", "short_text", "photos_status", "is_published")
     list_display_links = ("created", "product")
     list_editable = ("is_published",)
     list_filter = ("is_published", "rating", "created")
     search_fields = ("name", "text", "product__name")
     autocomplete_fields = ("product",)
     date_hierarchy = "created"
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("photos")
+
+    @admin.display(description="Фото")
+    def photos_status(self, obj):
+        photos = list(obj.photos.all())
+        if not photos:
+            return "—"
+        pending = sum(1 for p in photos if not p.is_approved)
+        return f"{len(photos)}" + (f" · чекає {pending}" if pending else " ✓")
+
+    @admin.action(description="Схвалити всі фото вибраних відгуків")
+    def approve_photos(self, request, queryset):
+        n = ReviewPhoto.objects.filter(review__in=queryset, is_approved=False).update(is_approved=True)
+        self.message_user(request, f"Схвалено фото: {n}.")
 
     @admin.display(description="Текст")
     def short_text(self, obj):

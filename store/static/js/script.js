@@ -201,16 +201,18 @@
    (далі фото рухається за курсором або пальцем), ще один клік повертає назад. */
 (function () {
   var main = document.querySelector("[data-gallery-main]");
-  if (!main) return;
-  var gallery = main.closest("[data-gallery]"),
+  var external = false, extAlt = "";   // перегляд довільних фото (напр., з відгуків) через window.openLightbox
+  var gallery = main ? main.closest("[data-gallery]") : null,
       lb, stage, img, count, closeBtn, prevBtn, nextBtn,
       urls = [], idx = 0, startIdx = 0, zoomed = false, baseRect = null,
       startX = null, startY = 0, handled = false, lastFocus = null;
 
-  main.classList.add("zoomable");
-  main.tabIndex = 0;
-  main.setAttribute("role", "button");
-  main.setAttribute("aria-label", "Збільшити фото");
+  if (main) {
+    main.classList.add("zoomable");
+    main.tabIndex = 0;
+    main.setAttribute("role", "button");
+    main.setAttribute("aria-label", "Збільшити фото");
+  }
 
   function build() {
     lb = document.createElement("div");
@@ -289,7 +291,7 @@
     idx = (i + urls.length) % urls.length;
     resetZoom();
     img.src = urls[idx];
-    img.alt = main.alt;
+    img.alt = external || !main ? extAlt : main.alt;
     count.textContent = urls.length > 1 ? (idx + 1) + " / " + urls.length : "";
     if (urls.length > 1) { // підвантажуємо сусідні фото наперед
       new Image().src = urls[(idx + 1) % urls.length];
@@ -300,6 +302,7 @@
     if (urls.length > 1) show(idx + d);
   }
   function open() {
+    external = false;
     if (!lb) build();
     urls = gallery && gallery.gallery ? gallery.gallery.urls() : [];
     if (!urls.length) urls = [main.getAttribute("src")];
@@ -316,14 +319,28 @@
     lb.hidden = true;
     resetZoom();
     document.body.style.overflow = "";
-    if (idx !== startIdx && gallery && gallery.gallery) gallery.gallery.show(idx); // галерея на сторінці показує те саме фото
+    if (!external && idx !== startIdx && gallery && gallery.gallery) gallery.gallery.show(idx); // галерея на сторінці показує те саме фото
     if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
   }
 
-  main.addEventListener("click", open);
-  main.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
-  });
+  if (main) {
+    main.addEventListener("click", open);
+    main.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+    });
+  }
+  window.openLightbox = function (list, i, alt) {
+    if (!list || !list.length) return;
+    external = true; extAlt = alt || "";
+    if (!lb) build();
+    urls = list.slice(); startIdx = i || 0;
+    lastFocus = document.activeElement;
+    prevBtn.hidden = nextBtn.hidden = urls.length < 2;
+    lb.hidden = false;
+    document.body.style.overflow = "hidden";
+    show(startIdx);
+    closeBtn.focus();
+  };
   document.addEventListener("keydown", function (e) {
     if (!lb || lb.hidden) return;
     if (e.key === "Escape") close();

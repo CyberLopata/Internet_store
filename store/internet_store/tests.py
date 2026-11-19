@@ -2,7 +2,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Order, Product, ProductImage, ProductVariant, Review
+from .models import Order, Product, ProductImage, ProductVariant, Review, ReviewPhoto
 
 
 class ShopFlowTests(TestCase):
@@ -971,3 +971,84 @@ class NovaPoshtaProfileTests(TestCase):
             self.assertContains(self.client.get("/account/"), "data-np-cities")
         with self.settings(NOVA_POSHTA_API_KEY=""):
             self.assertNotContains(self.client.get("/account/"), "data-np-cities")
+
+
+class ReviewPhotoTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_shop", verbosity=0)
+        cls.product = Product.objects.filter(is_active=True).first()
+
+    def tearDown(self):
+        for ph in ReviewPhoto.objects.all():
+            ph.delete()
+
+    @staticmethod
+    def img(name="a.png", size=(40, 30), color="red", fmt="PNG"):
+        from io import BytesIO
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        b = BytesIO(); Image.new("RGB", size, color).save(b, fmt)
+        return SimpleUploadedFile(name, b.getvalue(), content_type="image/" + fmt.lower())
+
+    def post(self, files, **extra):
+        data = {"name": "Оля", "rating": "5", "text": "Дуже гарні", "photos": files}
+        data.update(extra)
+        return self.client.post(self.product.get_absolute_url(), data)
+
+    def test_photos_saved_as_webp_and_hidden_until_approved(self):
+        r = self.post([self.img(), self.img("b.png", color="blue")])
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("reviewed=photos", r["Location"])
+        review = Review.objects.latest("pk")
+        photos = list(review.photos.all())
+        self.assertEqual(len(photos), 2)
+        self.assertTrue(all(p.image.name.endswith(".webp") and not p.is_approved for p in photos))
+        page = self.client.get(self.product.get_absolute_url())
+        self.assertContains(page, "Дуже гарні")
+        self.assertNotContains(page, photos[0].image.url)
+        photos[0].is_approved = True
+        photos[0].save()
+        page = self.client.get(self.product.get_absolute_url())
+        self.assertContains(page, photos[0].image.url)
+        self.assertNotContains(page, photos[1].image.url)
+
+    def test_review_without_photos_still_works(self):
+        r = self.post([])
+        self.assertIn("reviewed=1", r["Location"])
+        self.assertEqual(ReviewPhoto.objects.count(), 0)
+
+    def test_too_many_photos(self):
+        before = Review.objects.count()
+        r = self.post([self.img(f"{i}.png") for i in range(5)])
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "не більше 4")
+        self.assertEqual(Review.objects.count(), before)
+
+    def test_non_image_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        before = Review.objects.count()
+        r = self.post([SimpleUploadedFile("x.png", b"not an image", content_type="image/png")])
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "не є зображенням")
+        self.assertEqual(Review.objects.count(), before)
+
+    def test_deleting_review_removes_files(self):
+        self.post([self.img()])
+        review = Review.objects.latest("pk")
+        ph = review.photos.get()
+        storage, name = ph.image.storage, ph.image.name
+        self.assertTrue(storage.exists(name))
+        review.delete()
+        self.assertFalse(storage.exists(name))
+
+    def test_admin_approve_action(self):
+        from django.contrib.auth.models import User
+        User.objects.create_superuser("adm", "a@x.com", "pw12345678")
+        self.client.login(username="adm", password="pw12345678")
+        self.post([self.img()])
+        review = Review.objects.latest("pk")
+        r = self.client.post("/admin/internet_store/review/", {"action": "approve_photos", "_selected_action": [review.pk]}, follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(review.photos.get().is_approved)
+        self.assertEqual(self.client.get(f"/admin/internet_store/review/{review.pk}/change/").status_code, 200)

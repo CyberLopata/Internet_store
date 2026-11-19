@@ -78,15 +78,16 @@
           <time class="muted" datetime="{{ r.created|date:'c' }}">{{ r.created|date:"d.m.Y" }}</time>
         </div>
         <p>{{ r.text|linebreaksbr }}</p>
+        {% if r.approved_photos %}<div class="rv-photos" data-rv-photos>{% for ph in r.approved_photos %}<button type="button" class="rv-ph" data-src="{{ ph.image.url }}" aria-label="Збільшити фото {{ forloop.counter }} з {{ r.approved_photos|length }}"><img src="{{ ph.image.url }}" alt="Фото від {{ r.name }}" loading="lazy"></button>{% endfor %}</div>{% endif %}
       </article>
       {% empty %}
       <p class="rv-empty muted">Поки що немає відгуків. Будьте першим!</p>
       {% endfor %}
     </div>
 
-    <form class="summary form rv-form" method="post" action="{{ product.get_absolute_url }}#reviews">{% csrf_token %}
+    <form class="summary form rv-form" method="post" enctype="multipart/form-data" action="{{ product.get_absolute_url }}#reviews">{% csrf_token %}
       <h3>Залишити відгук</h3>
-      {% if just_reviewed %}<div class="msg success" role="status">Дякуємо! Ваш відгук опубліковано.</div>{% endif %}
+      {% if just_reviewed %}<div class="msg success" role="status">Дякуємо! Ваш відгук опубліковано.{% if reviewed_photos %} Фото з’являться після перевірки.{% endif %}</div>{% endif %}
       {% for e in form.non_field_errors %}<div class="err">{{ e }}</div>{% endfor %}
       <div class="field">
         <label for="{{ form.name.id_for_label }}">Ім'я</label>
@@ -105,6 +106,12 @@
         {{ form.text }}
         {% for e in form.text.errors %}<div class="err">{{ e }}</div>{% endfor %}
       </div>
+      <div class="field">
+        <label for="{{ form.photos.id_for_label }}">Фото <span class="muted">(необов'язково, до 4)</span></label>
+        {{ form.photos }}
+        <div class="rv-previews" data-rv-previews></div>
+        {% for e in form.photos.errors %}<div class="err">{{ e }}</div>{% endfor %}
+      </div>
       <div class="hp" aria-hidden="true"><label>Сайт <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
       <button class="add" type="submit">Надіслати відгук</button>
     </form>
@@ -118,4 +125,4 @@
 
 {% include "partials/_recent.html" %}
 {% endblock %}
-{% block extra_js %}{% load static %}{% if variants_data %}{{ variants_data|json_script:"variants-data" }}{% if gallery_colors %}{{ gallery_colors|json_script:"gallery-colors" }}{% endif %}<script src="{% static 'js/variants.js' %}"></script>{% endif %}{% endblock %}
+{% block extra_js %}{% load static %}<script src="{% static 'js/reviews.js' %}"></script>{% if variants_data %}{{ variants_data|json_script:"variants-data" }}{% if gallery_colors %}{{ gallery_colors|json_script:"gallery-colors" }}{% endif %}<script src="{% static 'js/variants.js' %}"></script>{% endif %}{% endblock %}

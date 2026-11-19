@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.db import transaction
 from django.core.paginator import Paginator
-from django.db.models import Avg, Count, F, Q
+from django.db.models import Avg, Count, F, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -13,7 +13,7 @@ from .cart import Cart
 from .forms import CheckoutForm, ReviewForm
 from . import recent as recent_views
 from .search import search_products
-from .models import Category, Order, OrderItem, Product, ProductVariant, get_profile
+from .models import Category, Order, OrderItem, Product, ProductVariant, ReviewPhoto, get_profile
 
 PAGE_SIZE = 12
 
@@ -78,15 +78,27 @@ def product_detail(request, slug):
     recent = recent_views.recent_products(request, exclude=product.pk)
     recent_views.remember(request, product)
     initial = {"name": request.user.first_name} if request.user.is_authenticated else None
-    form = ReviewForm(request.POST if request.method == "POST" else None, initial=initial)
+    form = ReviewForm(request.POST if request.method == "POST" else None,
+                      request.FILES if request.method == "POST" else None, initial=initial)
     just_reviewed = False
     if request.method == "POST" and form.is_valid():
         if form.cleaned_data["website"]:
             return redirect(f"{product.get_absolute_url()}#reviews")
         review = form.save(commit=False)
         review.product = product
-        review.save()
-        return redirect(f"{product.get_absolute_url()}?reviewed=1#reviews")
+        files = form.cleaned_data["photos"]
+        created = []
+        try:
+            with transaction.atomic():
+                review.save()
+                for n, f in enumerate(files):
+                    created.append(ReviewPhoto.objects.create(review=review, image=f, order=n))
+        except Exception:  # напр. пошкоджений файл: нічого не лишаємо, ні відгуку, ні файлів
+            for ph in created:
+                ph.image.storage.delete(ph.image.name)
+            form.add_error("photos", "Не вдалося обробити фото. Спробуйте інший файл.")
+        else:
+            return redirect(f"{product.get_absolute_url()}?reviewed={'photos' if files else '1'}#reviews")
 
     photos = [p for p in product.photos.all() if p.image]
     # нейтральні фото показуються одразу; фото кольору — лише коли покупець обирає цей колір
@@ -96,7 +108,8 @@ def product_detail(request, slug):
         urls = [p.image.url for p in photos if p.color.lower() == name.lower()]
         if urls:
             gallery_colors[name] = urls
-    reviews = product.reviews.filter(is_published=True)
+    reviews = product.reviews.filter(is_published=True).prefetch_related(
+        Prefetch("photos", queryset=ReviewPhoto.objects.filter(is_approved=True), to_attr="approved_photos"))
     review_stats = reviews.aggregate(total=Count("pk"), average=Avg("rating"))
     variants_data = [{
         "id": v.pk, "size": v.size, "color": v.color_name, "hex": v.color_hex, "stock": v.stock,
@@ -114,7 +127,8 @@ def product_detail(request, slug):
         "reviews_total": review_stats["total"],
         "rating_avg": review_stats["average"],
         "form": form,
-        "just_reviewed": request.GET.get("reviewed") == "1",
+        "just_reviewed": request.GET.get("reviewed") in ("1", "photos"),
+        "reviewed_photos": request.GET.get("reviewed") == "photos",
     })
 
 

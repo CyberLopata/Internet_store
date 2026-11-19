@@ -392,3 +392,13 @@ a.rate:hover{color:var(--primary)}
 .np-opt:hover,.np-opt.on{background:var(--surface)}
 .np-empty{padding:14px;text-align:center;color:var(--muted);font-size:14px}
 .np-msg[hidden]{display:none}
+
+/* ---- Фото у відгуках ---- */
+.rv-photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.rv-ph{width:72px;height:72px;padding:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);cursor:zoom-in}
+.rv-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.rv-ph:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.rv-previews{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.rv-previews img{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+.rv-form input[type=file]{width:100%;font-size:14px}
+.rv-form .err[hidden]{display:none}

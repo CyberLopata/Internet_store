@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.urls import reverse
 from PIL import Image, ImageOps
@@ -207,6 +207,10 @@ class Review(models.Model):
     def stars(self):
         return "★" * self.rating + "☆" * (5 - self.rating)
 
+    @property
+    def approved_photo_list(self):
+        return getattr(self, "approved_photos", None) or []
+
     @staticmethod
     def _sync_product_count(product_id):
         count = Review.objects.filter(product_id=product_id, is_published=True).count()
@@ -225,6 +229,50 @@ class Review(models.Model):
         product_id = self.product_id
         super().delete(*args, **kwargs)
         self._sync_product_count(product_id)
+
+MAX_REVIEW_PHOTOS = 4
+
+
+class ReviewPhoto(models.Model):
+    review = models.ForeignKey(Review, verbose_name="Відгук", on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(
+        "Фото", storage=product_image_storage, validators=[validate_image_size],
+        help_text="Автоматично зберігається як WebP.",
+    )
+    is_approved = models.BooleanField(
+        "Показувати", default=False,
+        help_text="Фото з'являється на сайті лише після того, як ви поставите цю позначку.",
+    )
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+    created = models.DateTimeField("Додано", auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "pk"]
+        verbose_name = "Фото до відгуку"
+        verbose_name_plural = "Фото до відгуків"
+
+    def __str__(self):
+        return f"Фото до відгуку #{self.review_id}"
+
+    def save(self, *args, **kwargs):
+        if self.image and not self.image._committed:
+            webp = to_webp(self.image.file, f"review-{self.review.product.slug}")
+            self.image.save(webp.name, webp, save=False)
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        image = self.image
+        super().delete(*args, **kwargs)
+        if image:
+            image.storage.delete(image.name)
+
+
+@receiver(post_delete, sender=ReviewPhoto)
+def _drop_review_photo_file(sender, instance, **kwargs):
+    # файл прибирається і тоді, коли фото видаляється каскадом (разом із відгуком чи товаром)
+    if instance.image:
+        instance.image.storage.delete(instance.image.name)
+
 
 
 class Order(models.Model):
