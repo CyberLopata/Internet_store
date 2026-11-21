@@ -230,16 +230,6 @@ def _checkout_initial(user):
         "name": user.get_full_name() or user.first_name, "phone": profile.phone, "email": user.email,
         "city": profile.city, "address": profile.address,
     }
-    """Запам'ятовує телефон і адресу в профілі, якщо там ці поля ще порожні."""
-    profile = get_profile(user)
-    changed = []
-    for field in ("phone", "city", "address"):
-        if not getattr(profile, field) and getattr(order, field):
-            setattr(profile, field, getattr(order, field))
-            changed.append(field)
-    if changed:
-        profile.save(update_fields=changed)
-
 
 def checkout(request):
     cart = Cart(request)
@@ -260,6 +250,9 @@ def checkout(request):
         cart.clear()
         request.session["last_order"] = order.pk
         return redirect("order_success", pk=order.pk)
+    return render(request, "checkout.html", {
+        "form": form, "items": items, "total": sum(i["subtotal"] for i in items), "np_enabled": novaposhta.enabled(),
+    })
 
 
 def order_success(request, pk):
