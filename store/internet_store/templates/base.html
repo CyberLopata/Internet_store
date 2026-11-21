@@ -23,7 +23,7 @@
 
 {% include "partials/_footer.html" %}
 {% include "partials/_cart_drawer.html" %}
-{% block chat %}{% include "partials/_chat_widget.html" %}{% endblock %}
+{% block chat %}{% if not user.is_staff %}{% include "partials/_chat_widget.html" %}{% endif %}{% endblock %}
 <script src="{% static 'js/script.js' %}"></script>
 <script src="{% static 'js/chat.js' %}"></script>
 <script src="{% static 'js/favorites.js' %}"></script>

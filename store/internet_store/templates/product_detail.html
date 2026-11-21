@@ -57,7 +57,7 @@
       <button class="add" type="submit" data-add-btn>Додати до кошика</button>
     </form>
 
-    <div class="ask">{% include "partials/_fav_button.html" with pid=product.pk label=True %}<button type="button" class="cta-outline" data-chat-open data-product-id="{{ product.pk }}" data-product-name="{{ product.name }}">💬 Запитати продавця (наприклад, про розмір чи наявність)</button></div>
+    <div class="ask">{% include "partials/_fav_button.html" with pid=product.pk label=True %}{% if not user.is_staff %}<button type="button" class="cta-outline" data-chat-open data-product-id="{{ product.pk }}" data-product-name="{{ product.name }}">💬 Запитати продавця (наприклад, про розмір чи наявність)</button>{% endif %} data-product-id="{{ product.pk }}" data-product-name="{{ product.name }}">💬 Запитати продавця (наприклад, про розмір чи наявність)</button></div>
 
     <ul class="guarantees">
       <li>🚚 <span>Нова пошта по всій Україні, безкоштовно від {{ SHOP.free_delivery_from }} ₴. <a href="{% url 'delivery' %}">Доставка та оплата</a></span></li>
