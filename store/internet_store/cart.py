@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from .models import Product, ProductVariant
+from .models import Product, ProductImage, ProductVariant
 
 SESSION_KEY = "cart"
 MAX_QTY = 99
@@ -75,6 +75,12 @@ class Cart:
         with_variants = set(ProductVariant.objects.filter(
             product_id__in=products, is_active=True).values_list("product_id", flat=True))
 
+        # фото кольорів: {id товару: {колір (нижній регістр): url першого фото цього кольору}}
+        color_photos = {}
+        for photo in ProductImage.objects.filter(product_id__in=products).exclude(color="").order_by("order", "pk"):
+            if photo.image:
+                color_photos.setdefault(photo.product_id, {}).setdefault(photo.color.strip().lower(), photo.image.url)
+
         result = []
         for key, (pid, vid) in parsed.items():
             product = products.get(pid)
@@ -90,8 +96,15 @@ class Cart:
                 qty = self.data[key] = variant.stock
                 limited = True
             unit = variant.effective_price if variant else product.price
+            # фото відповідно до вибраного кольору; якщо для кольору фото нема — загальне фото товару
+            image_url = None
+            if variant and variant.color_name:
+                image_url = color_photos.get(pid, {}).get(variant.color_name.strip().lower())
+            if not image_url and product.image:
+                image_url = product.image.url
             result.append({
                 "key": key, "product": product, "variant": variant, "quantity": qty, "limited": limited,
+                "image_url": image_url,
                 "unit_price": unit, "subtotal": unit * qty,
                 "label": variant.label if variant else "",
                 "max": variant.stock if variant else MAX_QTY,

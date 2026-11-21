@@ -7,7 +7,7 @@
   <div class="cart-list">
     {% for i in items %}
     <div class="crow">
-      <a class="cimg{% if i.product.image %} has-img{% endif %}" href="{{ i.product.get_absolute_url }}"{% if not i.product.image %} style="background:{{ i.product.color }}"{% endif %}>{% if i.product.image %}<img src="{{ i.product.image.url }}" alt="{{ i.product.name }}">{% else %}{{ i.product.emoji }}{% endif %}</a>
+      <a class="cimg{% if i.image_url %} has-img{% endif %}" href="{{ i.product.get_absolute_url }}"{% if not i.image_url %} style="background:{{ i.product.color }}"{% endif %}>{% if i.image_url %}<img src="{{ i.image_url }}" alt="{{ i.product.name }}">{% else %}{{ i.product.emoji }}{% endif %}</a>
       <div class="cname"><a href="{{ i.product.get_absolute_url }}">{{ i.product.name }}</a>{% if i.label %}<br><span class="vtag">{{ i.label }}</span>{% endif %}<br><b>{{ i.unit_price|floatformat:"0g" }} ₴</b>{% if i.limited %}<br><span class="vwarn">Доступно лише {{ i.max }} шт.</span>{% endif %}</div>
       <form method="post" action="{% url 'cart_update' i.key %}" class="qty">{% csrf_token %}
         <input type="number" name="quantity" value="{{ i.quantity }}" min="0" max="{{ i.max }}" aria-label="Кількість">
