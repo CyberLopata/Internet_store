@@ -13,13 +13,11 @@ from .cart import Cart
 from .forms import CheckoutForm, ReviewForm
 from . import recent as recent_views
 from .search import search_products
+from .services import OutOfStock, place_order, remember_delivery
 from .models import Category, Order, OrderItem, Product, ProductVariant, ReviewPhoto, get_profile
 
 PAGE_SIZE = 12
 
-
-class OutOfStock(Exception):
-    pass
 
 
 def index(request):
@@ -232,9 +230,6 @@ def _checkout_initial(user):
         "name": user.get_full_name() or user.first_name, "phone": profile.phone, "email": user.email,
         "city": profile.city, "address": profile.address,
     }
-
-
-def _remember_delivery(user, order):
     """Запам'ятовує телефон і адресу в профілі, якщо там ці поля ще порожні."""
     profile = get_profile(user)
     changed = []
@@ -256,39 +251,15 @@ def checkout(request):
     form = CheckoutForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         try:
-            with transaction.atomic():
-                # блокуємо рядки варіантів і ще раз перевіряємо залишок: так два покупці не купують останню пару
-                locked = {v.pk: v for v in ProductVariant.objects.select_for_update().filter(
-                    pk__in=[i["variant"].pk for i in items if i["variant"]])}
-                for i in items:
-                    if i["variant"]:
-                        fresh = locked.get(i["variant"].pk)
-                        if fresh is None or fresh.stock < i["quantity"]:
-                            raise OutOfStock(f"«{i['product'].name} ({i['label']})» уже немає в потрібній кількості.")
-                order = form.save(commit=False)
-                if request.user.is_authenticated:
-                    order.user = request.user
-                order.total = sum(i["subtotal"] for i in items)
-                order.save()
-                OrderItem.objects.bulk_create([
-                    OrderItem(order=order, product=i["product"], variant=i["variant"], variant_label=i["label"],
-                              product_name=i["product"].name, price=i["unit_price"], quantity=i["quantity"])
-                    for i in items
-                ])
-                for i in items:
-                    if i["variant"]:
-                        fresh = locked[i["variant"].pk]
-                        fresh.stock -= i["quantity"]
-                        fresh.save(update_fields=["stock"])
+            order = place_order(form.save(commit=False), items, request.user)
         except OutOfStock as e:
             messages.error(request, f"{e} Перегляньте кошик.")
             return redirect("cart")
         if request.user.is_authenticated:
-            _remember_delivery(request.user, order)
+            remember_delivery(request.user, order)
         cart.clear()
         request.session["last_order"] = order.pk
         return redirect("order_success", pk=order.pk)
-    return render(request, "checkout.html", {"np_enabled": novaposhta.enabled(), "form": form, "items": items, "total": sum(i["subtotal"] for i in items)})
 
 
 def order_success(request, pk):

@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework.authtoken',
     'internet_store',
 ]
 
@@ -169,3 +171,27 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'SHOP <noreply@shop.ex
 # Нова пошта: вибір міста й відділення на сторінці оформлення (довідники, без ТТН).
 # Безкоштовний ключ: new.novaposhta.ua -> Налаштування -> Безпека -> Створити ключ. Без ключа поля лишаються звичайними.
 NOVA_POSHTA_API_KEY = os.environ.get('NOVA_POSHTA_API_KEY', '')
+
+# ---- REST API (Django REST Framework), адреси /api/ ----
+REST_FRAMEWORK = {
+    # Сесійна автентифікація для браузера (cookie) і токени для мобільних застосунків/скриптів.
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    # Каталог і кошик відкриті для гостей; закриті адреси (замовлення) самі вимагають вхід.
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 12,
+    # Вебінтерфейс DRF вмикаємо лише в режимі розробки.
+    'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer']
+    + (['rest_framework.renderers.BrowsableAPIRenderer'] if DEBUG else []),
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '300/min', 'user': '600/min',
+        'reviews': '10/hour', 'checkout': '30/hour', 'auth': '10/min',
+    },
+}
